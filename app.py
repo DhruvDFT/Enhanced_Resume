@@ -879,6 +879,100 @@ def api_setup_gmail():
         scanner.add_log(error_msg, 'error')
         return jsonify({'status': 'error', 'message': error_msg})
 
+@app.route('/api/oauth-code', methods=['POST'])
+@admin_required
+def api_oauth_code():
+    """Submit OAuth authorization code"""
+    try:
+        data = request.get_json()
+        auth_code = data.get('code', '').strip()
+        
+        if not auth_code:
+            scanner.add_log("❌ No authorization code provided", 'error')
+            return jsonify({'status': 'error', 'message': 'Authorization code is required'})
+        
+        scanner.add_log(f"📋 Received authorization code: {auth_code[:10]}...", 'info')
+        
+        # Check if we have an OAuth flow stored
+        if not hasattr(scanner, '_oauth_flow') or not scanner._oauth_flow:
+            scanner.add_log("❌ No OAuth flow found. Please restart Gmail setup.", 'error')
+            return jsonify({'status': 'error', 'message': 'OAuth flow not found. Please click "Setup Gmail Integration" again.'})
+        
+        try:
+            scanner.add_log("🔄 Exchanging authorization code for tokens...", 'info')
+            
+            # Exchange code for credentials
+            scanner._oauth_flow.fetch_token(code=auth_code)
+            creds = scanner._oauth_flow.credentials
+            
+            scanner.add_log("✅ Successfully obtained OAuth tokens", 'success')
+            
+            # Save credentials for next run
+            try:
+                with open('token.json', 'w') as token:
+                    token.write(creds.to_json())
+                scanner.add_log("💾 Saved authentication token", 'success')
+            except Exception as e:
+                scanner.add_log(f"⚠️ Warning: Could not save token: {e}", 'warning')
+            
+            # Initialize Google services
+            try:
+                scanner.credentials = creds
+                scanner.add_log("🔧 Initializing Gmail service", 'info')
+                scanner.gmail_service = build('gmail', 'v1', credentials=creds)
+                
+                scanner.add_log("🔧 Initializing Drive service", 'info')
+                scanner.drive_service = build('drive', 'v3', credentials=creds)
+                
+                # Test Gmail access
+                scanner.add_log("🧪 Testing Gmail access", 'info')
+                result = scanner.gmail_service.users().getProfile(userId='me').execute()
+                email = result.get('emailAddress', 'Unknown')
+                scanner.add_log(f"✅ Gmail access confirmed for: {email}", 'success')
+                
+                # Test Drive access
+                scanner.add_log("🧪 Testing Drive access", 'info')
+                about = scanner.drive_service.about().get(fields='user').execute()
+                drive_email = about.get('user', {}).get('emailAddress', 'Unknown')
+                scanner.add_log(f"✅ Drive access confirmed for: {drive_email}", 'success')
+                
+                # Setup Drive folders
+                if scanner.setup_drive_folders():
+                    scanner.add_log("✅ OAuth authentication completed successfully", 'success')
+                    scanner.add_log("✅ Gmail and Drive setup completed successfully", 'success')
+                    
+                    # Clean up OAuth flow
+                    scanner._oauth_flow = None
+                    
+                    # Clean up temporary file
+                    if os.path.exists('temp_credentials.json'):
+                        os.remove('temp_credentials.json')
+                    
+                    return jsonify({'status': 'success', 'message': 'OAuth authentication completed successfully'})
+                else:
+                    scanner.add_log("❌ Drive folder setup failed", 'error')
+                    return jsonify({'status': 'error', 'message': 'Drive folder setup failed'})
+                
+            except Exception as e:
+                scanner.add_log(f"❌ Service initialization failed: {e}", 'error')
+                return jsonify({'status': 'error', 'message': f'Service initialization failed: {str(e)}'})
+            
+        except Exception as e:
+            scanner.add_log(f"❌ Failed to exchange authorization code: {e}", 'error')
+            
+            # Provide helpful error messages
+            if "invalid_grant" in str(e):
+                scanner.add_log("💡 The authorization code may have expired or been used already", 'warning')
+                scanner.add_log("🔄 Please try the Gmail setup process again", 'info')
+            elif "redirect_uri_mismatch" in str(e):
+                scanner.add_log("💡 Redirect URI mismatch. Check OAuth client configuration", 'warning')
+            
+            return jsonify({'status': 'error', 'message': f'Failed to exchange authorization code: {str(e)}'})
+        
+    except Exception as e:
+        scanner.add_log(f"❌ OAuth code submission failed: {e}", 'error')
+        return jsonify({'status': 'error', 'message': f'OAuth submission failed: {str(e)}'})
+
 @app.route('/api/scan/full', methods=['POST'])
 @admin_required
 def api_full_scan():
