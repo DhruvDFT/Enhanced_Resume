@@ -164,6 +164,51 @@ class VLSIGmailScanner:
             'recent_activity': []
         }
     
+    def create_credentials_from_env(self):
+        """Create credentials from environment variables (secure approach)"""
+        try:
+            # Get credentials from environment variables
+            client_id = os.environ.get('GOOGLE_CLIENT_ID')
+            client_secret = os.environ.get('GOOGLE_CLIENT_SECRET')
+            project_id = os.environ.get('GOOGLE_PROJECT_ID')
+            
+            if not all([client_id, client_secret, project_id]):
+                missing = []
+                if not client_id: missing.append('GOOGLE_CLIENT_ID')
+                if not client_secret: missing.append('GOOGLE_CLIENT_SECRET')
+                if not project_id: missing.append('GOOGLE_PROJECT_ID')
+                
+                self.add_log(f"❌ Missing environment variables: {', '.join(missing)}", 'error')
+                self.add_log("📋 Set these in Railway environment variables:", 'info')
+                self.add_log("   GOOGLE_CLIENT_ID = your-client-id.apps.googleusercontent.com", 'info')
+                self.add_log("   GOOGLE_CLIENT_SECRET = GOCSPX-your-secret", 'info')
+                self.add_log("   GOOGLE_PROJECT_ID = your-project-id", 'info')
+                return False
+            
+            # Create credentials dictionary
+            creds_data = {
+                "installed": {
+                    "client_id": client_id,
+                    "project_id": project_id,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                    "client_secret": client_secret,
+                    "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost"]
+                }
+            }
+            
+            # Create temporary credentials file
+            with open('temp_credentials.json', 'w') as f:
+                json.dump(creds_data, f)
+            
+            self.add_log("✅ Created credentials from environment variables", 'success')
+            return True
+            
+        except Exception as e:
+            self.add_log(f"❌ Error creating credentials from env: {e}", 'error')
+            return False
+
     def authenticate_google_apis(self):
         """Authenticate with Google APIs with detailed error logging"""
         if not GOOGLE_APIS_AVAILABLE:
@@ -171,15 +216,19 @@ class VLSIGmailScanner:
             return False
         
         try:
-            # Check if credentials.json exists and is valid
+            # First try to create credentials from environment variables
             if not os.path.exists('credentials.json'):
-                self.add_log("❌ credentials.json file not found", 'error')
-                self.add_log("📋 Upload credentials.json from Google Cloud Console", 'info')
-                return False
+                self.add_log("📋 No credentials.json found, trying environment variables", 'info')
+                if not self.create_credentials_from_env():
+                    return False
+                credentials_file = 'temp_credentials.json'
+            else:
+                credentials_file = 'credentials.json'
+                self.add_log("✅ Found credentials.json file", 'info')
             
-            # Try to read and validate credentials.json
+            # Try to read and validate credentials
             try:
-                with open('credentials.json', 'r') as f:
+                with open(credentials_file, 'r') as f:
                     creds_data = json.load(f)
                     
                 # Check if it's the right type of credentials
@@ -191,14 +240,14 @@ class VLSIGmailScanner:
                     self.add_log("✅ Found service account credentials", 'info')
                     return self.authenticate_service_account()
                 else:
-                    self.add_log("❌ Invalid credentials.json format", 'error')
+                    self.add_log("❌ Invalid credentials format", 'error')
                     return False
                     
             except json.JSONDecodeError as e:
-                self.add_log(f"❌ credentials.json is not valid JSON: {e}", 'error')
+                self.add_log(f"❌ Credentials file is not valid JSON: {e}", 'error')
                 return False
             except Exception as e:
-                self.add_log(f"❌ Error reading credentials.json: {e}", 'error')
+                self.add_log(f"❌ Error reading credentials file: {e}", 'error')
                 return False
             
             creds = None
@@ -240,7 +289,7 @@ class VLSIGmailScanner:
                     
                     try:
                         # Create OAuth flow
-                        flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+                        flow = InstalledAppFlow.from_client_secrets_file(credentials_file, SCOPES)
                         flow.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'  # For manual code entry
                         
                         # Generate authorization URL
@@ -298,6 +347,10 @@ class VLSIGmailScanner:
                 drive_email = about.get('user', {}).get('emailAddress', 'Unknown')
                 self.add_log(f"✅ Drive access confirmed for: {drive_email}", 'success')
                 
+                # Clean up temporary file
+                if os.path.exists('temp_credentials.json'):
+                    os.remove('temp_credentials.json')
+                
                 return True
                 
             except Exception as e:
@@ -320,7 +373,7 @@ class VLSIGmailScanner:
             
             # Provide helpful troubleshooting info
             self.add_log("🛠️ Troubleshooting steps:", 'info')
-            self.add_log("1. Verify credentials.json is from correct Google Cloud project", 'info')
+            self.add_log("1. Set environment variables in Railway", 'info')
             self.add_log("2. Check Gmail API and Drive API are enabled", 'info')
             self.add_log("3. Ensure OAuth consent screen is configured", 'info')
             
@@ -789,9 +842,21 @@ def api_setup_gmail():
             scanner.add_log(error_msg, 'error')
             return jsonify({'status': 'error', 'message': error_msg})
         
-        # Check if credentials file exists
-        if not os.path.exists('credentials.json'):
-            error_msg = "credentials.json file not found. Please upload your Google Cloud Console credentials."
+        # Check environment variables first
+        client_id = os.environ.get('GOOGLE_CLIENT_ID')
+        client_secret = os.environ.get('GOOGLE_CLIENT_SECRET')
+        project_id = os.environ.get('GOOGLE_PROJECT_ID')
+        
+        scanner.add_log("🔍 Checking authentication method...", 'info')
+        
+        if client_id and client_secret and project_id:
+            scanner.add_log("✅ Found environment variables for authentication", 'success')
+            scanner.add_log(f"📋 Using Project ID: {project_id}", 'info')
+            scanner.add_log(f"📋 Using Client ID: {client_id[:20]}...", 'info')
+        elif os.path.exists('credentials.json'):
+            scanner.add_log("✅ Found credentials.json file", 'info')
+        else:
+            error_msg = "No authentication method found. Set environment variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_PROJECT_ID) or upload credentials.json"
             scanner.add_log(error_msg, 'error')
             return jsonify({'status': 'error', 'message': error_msg})
         
@@ -891,10 +956,29 @@ def api_test_system():
         'credentials_file_exists': os.path.exists('credentials.json'),
         'token_file_exists': os.path.exists('token.json'),
         'gmail_service_active': bool(scanner.gmail_service),
-        'drive_service_active': bool(scanner.drive_service)
+        'drive_service_active': bool(scanner.drive_service),
+        # Check environment variables
+        'env_client_id': bool(os.environ.get('GOOGLE_CLIENT_ID')),
+        'env_client_secret': bool(os.environ.get('GOOGLE_CLIENT_SECRET')),
+        'env_project_id': bool(os.environ.get('GOOGLE_PROJECT_ID')),
+        'client_id_preview': os.environ.get('GOOGLE_CLIENT_ID', '')[:20] + '...' if os.environ.get('GOOGLE_CLIENT_ID') else 'Not set',
+        'project_id_value': os.environ.get('GOOGLE_PROJECT_ID', 'Not set')
     }
     
     scanner.add_log(f"System test results: {status}", 'info')
+    
+    # Log environment variable status
+    if status['env_client_id'] and status['env_client_secret'] and status['env_project_id']:
+        scanner.add_log("✅ All environment variables are set", 'success')
+    else:
+        scanner.add_log("❌ Missing environment variables", 'error')
+        if not status['env_client_id']:
+            scanner.add_log("❌ GOOGLE_CLIENT_ID not set", 'error')
+        if not status['env_client_secret']:
+            scanner.add_log("❌ GOOGLE_CLIENT_SECRET not set", 'error')
+        if not status['env_project_id']:
+            scanner.add_log("❌ GOOGLE_PROJECT_ID not set", 'error')
+    
     return jsonify({'status': 'success', 'system_status': status})
 
 @app.route('/health')
@@ -1366,20 +1450,46 @@ DASHBOARD_TEMPLATE = '''
                     
                     addLogToDisplay(`📦 Google APIs Available: ${status.google_apis_available ? '✅' : '❌'}`, status.google_apis_available ? 'success' : 'error');
                     addLogToDisplay(`📄 PDF Processing Available: ${status.pdf_processing_available ? '✅' : '❌'}`, status.pdf_processing_available ? 'success' : 'error');
-                    addLogToDisplay(`🔑 Credentials File: ${status.credentials_file_exists ? '✅ Found' : '❌ Missing'}`, status.credentials_file_exists ? 'success' : 'error');
+                    
+                    // Environment Variables Check
+                    addLogToDisplay('', 'info');
+                    addLogToDisplay('🔐 Environment Variables:', 'info');
+                    addLogToDisplay(`   GOOGLE_CLIENT_ID: ${status.env_client_id ? '✅ Set' : '❌ Missing'}`, status.env_client_id ? 'success' : 'error');
+                    addLogToDisplay(`   GOOGLE_CLIENT_SECRET: ${status.env_client_secret ? '✅ Set' : '❌ Missing'}`, status.env_client_secret ? 'success' : 'error');
+                    addLogToDisplay(`   GOOGLE_PROJECT_ID: ${status.env_project_id ? '✅ Set' : '❌ Missing'}`, status.env_project_id ? 'success' : 'error');
+                    
+                    if (status.client_id_preview !== 'Not set') {
+                        addLogToDisplay(`   Client ID Preview: ${status.client_id_preview}`, 'info');
+                    }
+                    if (status.project_id_value !== 'Not set') {
+                        addLogToDisplay(`   Project ID: ${status.project_id_value}`, 'info');
+                    }
+                    
+                    // File Status
+                    addLogToDisplay('', 'info');
+                    addLogToDisplay('📁 Files:', 'info');
+                    addLogToDisplay(`🔑 Credentials File: ${status.credentials_file_exists ? '✅ Found' : '❌ Missing (Using env vars)'}`, status.credentials_file_exists ? 'success' : 'warning');
                     addLogToDisplay(`🎫 Token File: ${status.token_file_exists ? '✅ Found' : '⚠️ Not created yet'}`, status.token_file_exists ? 'success' : 'warning');
+                    
+                    // Services
+                    addLogToDisplay('', 'info');
+                    addLogToDisplay('🔗 Services:', 'info');
                     addLogToDisplay(`📧 Gmail Service: ${status.gmail_service_active ? '✅ Active' : '❌ Not connected'}`, status.gmail_service_active ? 'success' : 'error');
                     addLogToDisplay(`💾 Drive Service: ${status.drive_service_active ? '✅ Active' : '❌ Not connected'}`, status.drive_service_active ? 'success' : 'error');
                     
                     // Provide next steps
+                    addLogToDisplay('', 'info');
+                    addLogToDisplay('📋 Next Steps:', 'info');
+                    
                     if (!status.google_apis_available) {
                         addLogToDisplay('❗ Install Google APIs: pip install google-auth google-auth-oauthlib google-api-python-client', 'warning');
                     }
-                    if (!status.credentials_file_exists) {
-                        addLogToDisplay('❗ Upload credentials.json from Google Cloud Console', 'warning');
-                    }
-                    if (status.credentials_file_exists && !status.gmail_service_active) {
-                        addLogToDisplay('▶️ Try clicking "Setup Gmail Integration" now', 'info');
+                    
+                    if (!status.env_client_id || !status.env_client_secret || !status.env_project_id) {
+                        addLogToDisplay('❗ Set missing environment variables in Railway dashboard', 'warning');
+                        addLogToDisplay('   Go to: Railway Project → Variables tab', 'info');
+                    } else if (!status.gmail_service_active) {
+                        addLogToDisplay('▶️ Environment variables are set! Try "Setup Gmail Integration"', 'success');
                     }
                 })
                 .catch(e => {
