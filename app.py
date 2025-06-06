@@ -885,6 +885,9 @@ def api_oauth_code():
     """Submit OAuth authorization code"""
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No data received'})
+            
         auth_code = data.get('code', '').strip()
         
         if not auth_code:
@@ -901,7 +904,7 @@ def api_oauth_code():
         try:
             scanner.add_log("🔄 Exchanging authorization code for tokens...", 'info')
             
-            # Exchange code for credentials
+            # Exchange code for credentials using the stored OAuth flow
             scanner._oauth_flow.fetch_token(code=auth_code)
             creds = scanner._oauth_flow.credentials
             
@@ -919,39 +922,44 @@ def api_oauth_code():
             try:
                 scanner.credentials = creds
                 scanner.add_log("🔧 Initializing Gmail service", 'info')
-                scanner.gmail_service = build('gmail', 'v1', credentials=creds)
                 
-                scanner.add_log("🔧 Initializing Drive service", 'info')
-                scanner.drive_service = build('drive', 'v3', credentials=creds)
-                
-                # Test Gmail access
-                scanner.add_log("🧪 Testing Gmail access", 'info')
-                result = scanner.gmail_service.users().getProfile(userId='me').execute()
-                email = result.get('emailAddress', 'Unknown')
-                scanner.add_log(f"✅ Gmail access confirmed for: {email}", 'success')
-                
-                # Test Drive access
-                scanner.add_log("🧪 Testing Drive access", 'info')
-                about = scanner.drive_service.about().get(fields='user').execute()
-                drive_email = about.get('user', {}).get('emailAddress', 'Unknown')
-                scanner.add_log(f"✅ Drive access confirmed for: {drive_email}", 'success')
-                
-                # Setup Drive folders
-                if scanner.setup_drive_folders():
-                    scanner.add_log("✅ OAuth authentication completed successfully", 'success')
-                    scanner.add_log("✅ Gmail and Drive setup completed successfully", 'success')
+                if GOOGLE_APIS_AVAILABLE:
+                    scanner.gmail_service = build('gmail', 'v1', credentials=creds)
                     
-                    # Clean up OAuth flow
-                    scanner._oauth_flow = None
+                    scanner.add_log("🔧 Initializing Drive service", 'info')
+                    scanner.drive_service = build('drive', 'v3', credentials=creds)
                     
-                    # Clean up temporary file
-                    if os.path.exists('temp_credentials.json'):
-                        os.remove('temp_credentials.json')
+                    # Test Gmail access
+                    scanner.add_log("🧪 Testing Gmail access", 'info')
+                    result = scanner.gmail_service.users().getProfile(userId='me').execute()
+                    email = result.get('emailAddress', 'Unknown')
+                    scanner.add_log(f"✅ Gmail access confirmed for: {email}", 'success')
                     
-                    return jsonify({'status': 'success', 'message': 'OAuth authentication completed successfully'})
+                    # Test Drive access
+                    scanner.add_log("🧪 Testing Drive access", 'info')
+                    about = scanner.drive_service.about().get(fields='user').execute()
+                    drive_email = about.get('user', {}).get('emailAddress', 'Unknown')
+                    scanner.add_log(f"✅ Drive access confirmed for: {drive_email}", 'success')
+                    
+                    # Setup Drive folders
+                    if scanner.setup_drive_folders():
+                        scanner.add_log("✅ OAuth authentication completed successfully", 'success')
+                        scanner.add_log("✅ Gmail and Drive setup completed successfully", 'success')
+                        
+                        # Clean up OAuth flow
+                        scanner._oauth_flow = None
+                        
+                        # Clean up temporary file
+                        if os.path.exists('temp_credentials.json'):
+                            os.remove('temp_credentials.json')
+                        
+                        return jsonify({'status': 'success', 'message': 'OAuth authentication completed successfully'})
+                    else:
+                        scanner.add_log("❌ Drive folder setup failed", 'error')
+                        return jsonify({'status': 'error', 'message': 'Drive folder setup failed'})
                 else:
-                    scanner.add_log("❌ Drive folder setup failed", 'error')
-                    return jsonify({'status': 'error', 'message': 'Drive folder setup failed'})
+                    scanner.add_log("❌ Google APIs not available", 'error')
+                    return jsonify({'status': 'error', 'message': 'Google APIs not available'})
                 
             except Exception as e:
                 scanner.add_log(f"❌ Service initialization failed: {e}", 'error')
@@ -961,10 +969,11 @@ def api_oauth_code():
             scanner.add_log(f"❌ Failed to exchange authorization code: {e}", 'error')
             
             # Provide helpful error messages
-            if "invalid_grant" in str(e):
+            error_str = str(e).lower()
+            if "invalid_grant" in error_str:
                 scanner.add_log("💡 The authorization code may have expired or been used already", 'warning')
                 scanner.add_log("🔄 Please try the Gmail setup process again", 'info')
-            elif "redirect_uri_mismatch" in str(e):
+            elif "redirect_uri_mismatch" in error_str:
                 scanner.add_log("💡 Redirect URI mismatch. Check OAuth client configuration", 'warning')
             
             return jsonify({'status': 'error', 'message': f'Failed to exchange authorization code: {str(e)}'})
