@@ -1,4 +1,105 @@
-import os
+def setup_drive_folders(self) -> bool:
+        """Create necessary folders in Google Drive with domain-based organization"""
+        try:
+            if not self.drive_service:
+                self.add_log("❌ Drive service not initialized", 'error')
+                return False
+            
+            self.add_log("📁 Setting up domain-based Drive folder structure", 'info')
+            
+            # Check if main folder already exists
+            query = "name='VLSI Resume Scanner' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
+            
+            if results.get('files'):
+                parent_folder = results['files'][0]
+                parent_folder_id = parent_folder['id']
+                self.add_log(f"✅ Found existing parent folder: {parent_folder['name']}", 'success')
+            else:
+                # Create parent folder
+                parent_metadata = {
+                    'name': 'VLSI Resume Scanner',
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                parent_folder = self.drive_service.files().create(body=parent_metadata, fields='id').execute()
+                parent_folder_id = parent_folder.get('id')
+                self.add_log("✅ Created parent folder: VLSI Resume Scanner", 'success')
+            
+            # Create/find main resumes folder
+            resume_query = f"name='Resumes by Domain' and parents in '{parent_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            resume_results = self.drive_service.files().list(q=resume_query, fields="files(id, name)").execute()
+            
+            if resume_results.get('files'):
+                self.resume_folder_id = resume_results['files'][0]['id']
+                self.add_log("✅ Found existing 'Resumes by Domain' folder", 'success')
+            else:
+                resume_metadata = {
+                    'name': 'Resumes by Domain',
+                    'parents': [parent_folder_id],
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                resume_folder = self.drive_service.files().create(body=resume_metadata, fields='id').execute()
+                self.resume_folder_id = resume_folder.get('id')
+                self.add_log("✅ Created 'Resumes by Domain' folder", 'success')
+            
+            # Create domain-specific subfolders
+            domain_descriptions = {
+                'Physical Design': '🏗️ Place & Route, Floorplanning, STA, Power Analysis',
+                'Design Verification': '🔍 UVM, SystemVerilog, Testbenches, Coverage',
+                'DFT': '🧪 ATPG, BIST, Scan Chains, Test Compression',
+                'RTL Design': '⚡ Verilog, SystemVerilog, Logic Design, Synthesis',
+                'Analog Design': '📡 OpAmps, ADC/DAC, PLL, Mixed Signal',
+                'FPGA': '🔧 Xilinx, Altera, Vivado, Quartus',
+                'Silicon Validation': '🔬 Post-Silicon, ATE, Lab Validation',
+                'Mixed Signal': '⚖️ High-Speed, SerDes, Signal Integrity',
+                'General VLSI': '🎯 General VLSI/ASIC Experience',
+                'Unknown Domain': '❓ Unclassified Technical Resumes'
+            }
+            
+            for domain_name, description in domain_descriptions.items():
+                folder_query = f"name='{domain_name}' and parents in '{self.resume_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                folder_results = self.drive_service.files().list(q=folder_query, fields="files(id, name)").execute()
+                
+                if folder_results.get('files'):
+                    folder_id = folder_results['files'][0]['id']
+                    self.domain_folders[domain_name] = folder_id
+                    self.add_log(f"✅ Found existing folder: {domain_name}", 'success')
+                else:
+                    folder_metadata = {
+                        'name': domain_name,
+                        'parents': [self.resume_folder_id],
+                        'mimeType': 'application/vnd.google-apps.folder',
+                        'description': description
+                    }
+                    folder = self.drive_service.files().create(body=folder_metadata, fields='id').execute()
+                    folder_id = folder.get('id')
+                    self.domain_folders[domain_name] = folder_id
+                    self.add_log(f"✅ Created domain folder: {domain_name}", 'success')
+                    
+                    # Create experience-based subfolders within each domain
+                    experience_levels = ['Fresher (0-2 years)', 'Mid-Level (2-5 years)', 'Senior (5-8 years)', 'Experienced (8+ years)']
+                    for exp_level in experience_levels:
+                        exp_metadata = {
+                            'name': exp_level,
+                            'parents': [folder_id],
+                            'mimeType': 'application/vnd.google-apps.folder'
+                        }
+                        self.drive_service.files().create(body=exp_metadata, fields='id').execute()
+                        self.add_log(f"✅ Created experience subfolder: {domain_name}/{exp_level}", 'info')
+            
+            # Create processed emails folder
+            processed_query = f"name='Processed Emails' and parents in '{parent_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            processed_results = self.drive_service.files().list(q=processed_query, fields="files(id, name)").execute()
+            
+            if processed_results.get('files'):
+                self.processed_folder_id = processed_results['files'][0]['id']
+                self.add_log("✅ Found existing Processed Emails folder", 'success')
+            else:
+                processed_metadata = {
+                    'name': 'Processed Emails',
+                    'parents': [parent_folder_id],
+                    'mimeType': 'application/vnd.google-apps.folder'
+                import os
 import json
 import logging
 import traceback
@@ -33,6 +134,20 @@ except ImportError:
     except ImportError:
         PDF_PROCESSING_AVAILABLE = False
 
+# Try to import DOC processing
+try:
+    import docx
+    from docx import Document
+    DOCX_PROCESSING_AVAILABLE = True
+except ImportError:
+    DOCX_PROCESSING_AVAILABLE = False
+
+try:
+    import python_docx2txt
+    DOC_PROCESSING_AVAILABLE = True
+except ImportError:
+    DOC_PROCESSING_AVAILABLE = False
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'vlsi-scanner-secret-key-2024')
 
@@ -61,6 +176,26 @@ class VLSIResumeScanner:
         }
         self.resume_folder_id = None
         self.processed_folder_id = None
+        self.high_score_folder_id = None
+        self.medium_score_folder_id = None
+        self.low_score_folder_id = None
+        self.domain_folders = {
+            'Physical Design': None,
+            'Design Verification': None, 
+            'DFT': None,
+            'RTL Design': None,
+            'Analog Design': None,
+            'FPGA': None,
+            'Silicon Validation': None,
+            'Mixed Signal': None,
+            'General VLSI': None,
+            'Unknown Domain': None
+        }
+        # Experience level tracking
+        self.experience_levels = ['Fresher (0-2 years)', 'Mid-Level (2-5 years)', 'Senior (5+ years)', 'Experienced (8+ years)']
+        # User management
+        self.current_user_email = None
+        self.user_credentials = {}  # Store multiple user credentials
         
     def add_log(self, message: str, level: str = 'info'):
         """Add a log entry with timestamp"""
@@ -84,18 +219,28 @@ class VLSIResumeScanner:
         else:
             logging.info(f"[{timestamp}] {message}")
 
-    def authenticate_google_apis(self) -> bool:
+    def authenticate_google_apis(self, user_email: str = None) -> bool:
         """Authenticate with Google APIs using environment variables or credentials.json"""
         try:
             creds = None
             
-            # Try to load existing token
-            if os.path.exists('token.json'):
-                try:
-                    creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-                    self.add_log("🔐 Loaded existing authentication token", 'info')
-                except Exception as e:
-                    self.add_log(f"⚠️ Could not load existing token: {e}", 'warning')
+            # Try to load existing token for specific user
+            if user_email:
+                token_file = f'token_{user_email.replace("@", "_").replace(".", "_")}.json'
+                if os.path.exists(token_file):
+                    try:
+                        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+                        self.add_log(f"🔐 Loaded existing token for {user_email}", 'info')
+                    except Exception as e:
+                        self.add_log(f"⚠️ Could not load token for {user_email}: {e}", 'warning')
+            else:
+                # Try default token
+                if os.path.exists('token.json'):
+                    try:
+                        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+                        self.add_log("🔐 Loaded existing authentication token", 'info')
+                    except Exception as e:
+                        self.add_log(f"⚠️ Could not load existing token: {e}", 'warning')
             
             # If there are no (valid) credentials available
             if not creds or not creds.valid:
@@ -108,17 +253,29 @@ class VLSIResumeScanner:
                         creds = None
                 
                 if not creds:
-                    return self._run_oauth_flow()
+                    return self._run_oauth_flow(user_email)
             
-            # Test the credentials
+            # Test the credentials and set current user
             self.credentials = creds
-            return self._test_credentials()
+            if self._test_credentials():
+                # Get user email from credentials
+                if self.gmail_service:
+                    try:
+                        profile = self.gmail_service.users().getProfile(userId='me').execute()
+                        self.current_user_email = profile.get('emailAddress')
+                        self.user_credentials[self.current_user_email] = creds
+                        self.add_log(f"✅ Authenticated as: {self.current_user_email}", 'success')
+                    except Exception as e:
+                        self.add_log(f"⚠️ Could not get user profile: {e}", 'warning')
+                return True
+            else:
+                return False
             
         except Exception as e:
             self.add_log(f"❌ Authentication failed: {e}", 'error')
             return False
 
-    def _run_oauth_flow(self) -> bool:
+    def _run_oauth_flow(self, user_email: str = None) -> bool:
         """Run OAuth flow for new authentication"""
         try:
             # Try environment variables first
@@ -180,19 +337,22 @@ class VLSIResumeScanner:
             # Store OAuth flow for later use with manual code entry
             self._oauth_flow = flow
             
-            # Generate auth URL
+            # Generate auth URL with account selection
             auth_url, _ = flow.authorization_url(
                 access_type='offline',
-                prompt='consent',
+                prompt='select_account',  # Forces account selection
                 include_granted_scopes='true'
             )
             
             self.add_log("🌐 OAuth authorization required", 'info')
             self.add_log(f"📋 Authorization URL: {auth_url}", 'info')
             self.add_log("1️⃣ Copy the URL above and open in browser", 'info')
-            self.add_log("2️⃣ Complete Google authorization", 'info')
-            self.add_log("3️⃣ Copy the authorization code", 'info')
-            self.add_log("4️⃣ Enter it in the form below", 'info')
+            self.add_log("2️⃣ Select your Gmail account or login with team member's account", 'info')
+            self.add_log("3️⃣ Complete Google authorization", 'info')
+            self.add_log("4️⃣ Copy the authorization code", 'info')
+            self.add_log("5️⃣ Enter it in the form below", 'info')
+            if user_email:
+                self.add_log(f"👤 Authenticating for user: {user_email}", 'info')
             
             return False  # Indicates manual intervention needed
             
@@ -231,15 +391,15 @@ class VLSIResumeScanner:
             return False
 
     def setup_drive_folders(self) -> bool:
-        """Create necessary folders in Google Drive"""
+        """Create necessary folders in Google Drive with score-based organization"""
         try:
             if not self.drive_service:
                 self.add_log("❌ Drive service not initialized", 'error')
                 return False
             
-            self.add_log("📁 Setting up Drive folders", 'info')
+            self.add_log("📁 Setting up enhanced Drive folder structure", 'info')
             
-            # Check if folders already exist
+            # Check if main folder already exists
             query = "name='VLSI Resume Scanner' and mimeType='application/vnd.google-apps.folder' and trashed=false"
             results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
             
@@ -257,7 +417,7 @@ class VLSIResumeScanner:
                 parent_folder_id = parent_folder.get('id')
                 self.add_log("✅ Created parent folder: VLSI Resume Scanner", 'success')
             
-            # Create/find resumes subfolder
+            # Create/find main resumes folder
             resume_query = f"name='Resumes' and parents in '{parent_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
             resume_results = self.drive_service.files().list(q=resume_query, fields="files(id, name)").execute()
             
@@ -272,9 +432,35 @@ class VLSIResumeScanner:
                 }
                 resume_folder = self.drive_service.files().create(body=resume_metadata, fields='id').execute()
                 self.resume_folder_id = resume_folder.get('id')
-                self.add_log("✅ Created Resumes subfolder", 'success')
+                self.add_log("✅ Created Resumes folder", 'success')
             
-            # Create/find processed emails subfolder
+            # Create score-based subfolders
+            score_folders = {
+                'High Priority (Score 0.7+)': 'high_score_folder_id',
+                'Medium Priority (Score 0.4-0.7)': 'medium_score_folder_id', 
+                'Low Priority (Score 0.1-0.4)': 'low_score_folder_id'
+            }
+            
+            for folder_name, attr_name in score_folders.items():
+                folder_query = f"name='{folder_name}' and parents in '{self.resume_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                folder_results = self.drive_service.files().list(q=folder_query, fields="files(id, name)").execute()
+                
+                if folder_results.get('files'):
+                    folder_id = folder_results['files'][0]['id']
+                    setattr(self, attr_name, folder_id)
+                    self.add_log(f"✅ Found existing folder: {folder_name}", 'success')
+                else:
+                    folder_metadata = {
+                        'name': folder_name,
+                        'parents': [self.resume_folder_id],
+                        'mimeType': 'application/vnd.google-apps.folder'
+                    }
+                    folder = self.drive_service.files().create(body=folder_metadata, fields='id').execute()
+                    folder_id = folder.get('id')
+                    setattr(self, attr_name, folder_id)
+                    self.add_log(f"✅ Created folder: {folder_name}", 'success')
+            
+            # Create processed emails folder
             processed_query = f"name='Processed Emails' and parents in '{parent_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
             processed_results = self.drive_service.files().list(q=processed_query, fields="files(id, name)").execute()
             
@@ -289,7 +475,10 @@ class VLSIResumeScanner:
                 }
                 processed_folder = self.drive_service.files().create(body=processed_metadata, fields='id').execute()
                 self.processed_folder_id = processed_folder.get('id')
-                self.add_log("✅ Created Processed Emails subfolder", 'success')
+                self.add_log("✅ Created Processed Emails folder", 'success')
+            
+            # Create summary document
+            self._create_summary_document(parent_folder_id)
             
             return True
             
@@ -306,8 +495,8 @@ class VLSIResumeScanner:
             
             self.add_log(f"🔍 Starting Gmail scan (max: {max_results or 'unlimited'})", 'info')
             
-            # Search for emails with PDF attachments
-            query = 'has:attachment filename:pdf'
+            # Search for emails with PDF or DOC attachments
+            query = 'has:attachment (filename:pdf OR filename:doc OR filename:docx)'
             if max_results:
                 query += f' newer_than:30d'  # Limit to last 30 days for quick scans
             
@@ -331,7 +520,7 @@ class VLSIResumeScanner:
             if max_results:
                 messages = messages[:max_results]
             
-            self.add_log(f"📧 Found {len(messages)} emails with PDF attachments", 'info')
+            self.add_log(f"📧 Found {len(messages)} emails with PDF/DOC attachments", 'info')
             
             resumes_found = 0
             processed_count = 0
@@ -385,16 +574,18 @@ class VLSIResumeScanner:
             sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
             date_header = next((h['value'] for h in headers if h['name'] == 'Date'), '')
             
-            # Check for attachments
+            # Check for attachments (PDF, DOC, DOCX)
             attachments = []
             if 'parts' in message['payload']:
                 for part in message['payload']['parts']:
-                    if part.get('filename') and part.get('filename').lower().endswith('.pdf'):
+                    filename = part.get('filename', '').lower()
+                    if filename and (filename.endswith('.pdf') or filename.endswith('.doc') or filename.endswith('.docx')):
                         if 'body' in part and 'attachmentId' in part['body']:
                             attachments.append({
                                 'filename': part['filename'],
                                 'attachment_id': part['body']['attachmentId'],
-                                'size': part['body'].get('size', 0)
+                                'size': part['body'].get('size', 0),
+                                'type': 'pdf' if filename.endswith('.pdf') else 'doc'
                             })
             
             has_resume = False
@@ -411,13 +602,16 @@ class VLSIResumeScanner:
                     
                     data = base64.urlsafe_b64decode(att['data'])
                     
-                    # Process PDF
-                    resume_score = self.analyze_pdf_content(data, attachment['filename'])
+                    # Process based on file type
+                    if attachment['type'] == 'pdf':
+                        analysis_result = self.analyze_pdf_content(data, attachment['filename'])
+                    else:  # DOC/DOCX
+                        analysis_result = self.analyze_doc_content(data, attachment['filename'])
                     
-                    if resume_score and resume_score > 0.3:  # Threshold for considering it a resume
+                    if analysis_result and analysis_result.get('is_resume', False):
                         has_resume = True
                         
-                        # Save to Drive
+                        # Save to Drive with domain categorization
                         drive_file_id = self.save_to_drive(
                             data,
                             attachment['filename'],
@@ -425,17 +619,22 @@ class VLSIResumeScanner:
                                 'subject': subject,
                                 'sender': sender,
                                 'date': date_header,
-                                'score': resume_score
+                                'resume_score': analysis_result.get('resume_score', 0),
+                                'domain': analysis_result.get('domain', 'Unknown Domain'),
+                                'domain_score': analysis_result.get('domain_score', 0),
+                                'analysis_result': analysis_result
                             }
                         )
                         
                         processed_attachments.append({
                             'filename': attachment['filename'],
-                            'score': resume_score,
+                            'resume_score': analysis_result.get('resume_score', 0),
+                            'domain': analysis_result.get('domain', 'Unknown Domain'),
+                            'domain_score': analysis_result.get('domain_score', 0),
                             'drive_file_id': drive_file_id
                         })
                         
-                        self.add_log(f"✅ Resume found: {attachment['filename']} (score: {resume_score:.2f})", 'success')
+                        self.add_log(f"✅ Resume found: {attachment['filename']} | Domain: {analysis_result.get('domain', 'Unknown')} | Score: {analysis_result.get('resume_score', 0):.2f}", 'success')
                     
                 except Exception as e:
                     self.add_log(f"❌ Error processing attachment {attachment['filename']}: {e}", 'error')
@@ -454,16 +653,68 @@ class VLSIResumeScanner:
             self.add_log(f"❌ Error processing email {message_id}: {e}", 'error')
             return {'message_id': message_id, 'error': str(e)}
 
-    def analyze_pdf_content(self, pdf_data: bytes, filename: str) -> float:
-        """Analyze PDF content to determine if it's likely a resume"""
+    def analyze_doc_content(self, doc_data: bytes, filename: str) -> float:
+        """Analyze DOC/DOCX content to determine if it's likely a resume"""
         try:
-            if not PDF_PROCESSING_AVAILABLE:
-                self.add_log("⚠️ PDF processing not available, assuming it's a resume", 'warning')
-                return 0.5  # Default moderate score
+            text = ""
             
-            text = self.extract_text_from_pdf(pdf_data)
+            # Create a temporary file
+            with tempfile.NamedTemporaryFile(suffix='.docx' if filename.lower().endswith('.docx') else '.doc', delete=False) as temp_file:
+                temp_file.write(doc_data)
+                temp_file_path = temp_file.name
+            
+            try:
+                if filename.lower().endswith('.docx'):
+                    # Process DOCX files
+                    if DOCX_PROCESSING_AVAILABLE:
+                        try:
+                            doc = Document(temp_file_path)
+                            for paragraph in doc.paragraphs:
+                                text += paragraph.text + "\n"
+                            self.add_log(f"📄 Extracted text from DOCX: {filename}", 'info')
+                        except Exception as e:
+                            self.add_log(f"❌ DOCX extraction failed for {filename}: {e}", 'error')
+                            return 0.0
+                    else:
+                        self.add_log("⚠️ DOCX processing not available, install python-docx", 'warning')
+                        return 0.5  # Default moderate score
+                
+                else:
+                    # Process DOC files
+                    if DOC_PROCESSING_AVAILABLE:
+                        try:
+                            import docx2txt
+                            text = docx2txt.process(temp_file_path)
+                            self.add_log(f"📄 Extracted text from DOC: {filename}", 'info')
+                        except Exception as e:
+                            self.add_log(f"❌ DOC extraction failed for {filename}: {e}", 'error')
+                            return 0.0
+                    else:
+                        self.add_log("⚠️ DOC processing not available, install docx2txt", 'warning')
+                        return 0.5  # Default moderate score
+                
+            finally:
+                # Clean up temporary file
+                os.unlink(temp_file_path)
+            
             if not text:
+                self.add_log(f"⚠️ No text extracted from {filename}", 'warning')
                 return 0.0
+            
+            # Use the same resume analysis logic as PDF
+            return self._analyze_resume_text(text, filename)
+            
+        except Exception as e:
+            self.add_log(f"❌ Error analyzing DOC {filename}: {e}", 'error')
+            return {
+                'resume_score': 0.0,
+                'domain': 'Unknown Domain', 
+                'domain_score': 0.0,
+                'is_resume': False
+            }
+    def _analyze_resume_text(self, text: str, filename: str) -> float:
+        """Analyze text content to determine if it's likely a resume"""
+        try:
             
             # Convert to lowercase for analysis
             text_lower = text.lower()
@@ -582,29 +833,146 @@ class VLSIResumeScanner:
             self.add_log(f"❌ PDF text extraction failed: {e}", 'error')
             return ""
 
-    def save_to_drive(self, file_data: bytes, filename: str, metadata: Dict) -> Optional[str]:
-        """Save file to Google Drive with metadata"""
+    def _create_summary_document(self, parent_folder_id: str):
+        """Create a summary document to track scanning results"""
         try:
-            if not self.drive_service or not self.resume_folder_id:
-                self.add_log("❌ Drive service or folder not available", 'error')
+            # Check if summary document already exists
+            summary_query = f"name='Resume Scanning Summary' and parents in '{parent_folder_id}' and mimeType='application/vnd.google-apps.document' and trashed=false"
+            summary_results = self.drive_service.files().list(q=summary_query, fields="files(id, name)").execute()
+            
+            if not summary_results.get('files'):
+                # Create summary document
+                summary_metadata = {
+                    'name': 'Resume Scanning Summary',
+                    'parents': [parent_folder_id],
+                    'mimeType': 'application/vnd.google-apps.document'
+                }
+                summary_doc = self.drive_service.files().create(body=summary_metadata, fields='id').execute()
+                self.add_log("✅ Created Resume Scanning Summary document", 'success')
+            else:
+                self.add_log("✅ Found existing Resume Scanning Summary document", 'success')
+                
+        except Exception as e:
+            self.add_log(f"⚠️ Could not create summary document: {e}", 'warning')
+
+    def save_to_drive(self, file_data: bytes, filename: str, metadata: Dict) -> Optional[str]:
+        """Save file to Google Drive with domain and experience-based organization"""
+        try:
+            if not self.drive_service:
+                self.add_log("❌ Drive service not available", 'error')
                 return None
             
-            # Create file metadata
+            # Get domain and experience info from analysis
+            domain = metadata.get('domain', 'Unknown Domain')
+            resume_score = metadata.get('resume_score', 0)
+            experience_info = metadata.get('experience_info', {})
+            experience_level = experience_info.get('level', 'Unknown')
+            experience_years = experience_info.get('years', 0)
+            
+            # Get domain folder ID
+            domain_folder_id = self.domain_folders.get(domain)
+            if not domain_folder_id:
+                self.add_log(f"⚠️ Domain folder not found for {domain}, using Unknown Domain", 'warning')
+                domain_folder_id = self.domain_folders.get('Unknown Domain', self.resume_folder_id)
+            
+            # Find experience subfolder
+            exp_folder_query = f"name='{experience_level}' and parents in '{domain_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            exp_folder_results = self.drive_service.files().list(q=exp_folder_query, fields="files(id, name)").execute()
+            
+            if exp_folder_results.get('files'):
+                target_folder_id = exp_folder_results['files'][0]['id']
+            else:
+                # Create experience subfolder if it doesn't exist
+                exp_metadata = {
+                    'name': experience_level,
+                    'parents': [domain_folder_id],
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                exp_folder_obj = self.drive_service.files().create(body=exp_metadata, fields='id').execute()
+                target_folder_id = exp_folder_obj.get('id')
+                self.add_log(f"✅ Created experience subfolder: {domain}/{experience_level}", 'info')
+            
+            # Create enhanced file metadata
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            file_extension = filename.split('.')[-1].lower()
+            clean_filename = filename.replace(f'.{file_extension}', '')
+            
+            # Enhanced filename with domain and experience
+            domain_abbrev = {
+                'Physical Design': 'PD',
+                'Design Verification': 'DV', 
+                'DFT': 'DFT',
+                'RTL Design': 'RTL',
+                'Analog Design': 'ANA',
+                'FPGA': 'FPGA',
+                'Silicon Validation': 'SiVal',
+                'Mixed Signal': 'MS',
+                'General VLSI': 'VLSI',
+                'Unknown Domain': 'UNK'
+            }.get(domain, 'UNK')
+            
+            exp_abbrev = {
+                'Fresher (0-2 years)': 'FR',
+                'Mid-Level (2-5 years)': 'ML',
+                'Senior (5-8 years)': 'SR',
+                'Experienced (8+ years)': 'EX'
+            }.get(experience_level, 'UK')
+            
+            new_filename = f"[{domain_abbrev}_{exp_abbrev}_{experience_years}Y] {timestamp}_{clean_filename}.{file_extension}"
+            
+            # Get domain-specific matches for description
+            analysis_result = metadata.get('analysis_result', {})
+            domain_matches = analysis_result.get('domain_matches', {}).get(domain, [])
+            top_keywords = ', '.join(domain_matches[:5]) if domain_matches else 'No specific keywords found'
+            experience_evidence = ', '.join(experience_info.get('evidence', ['Not specified'])[:3])
+            
             file_metadata = {
-                'name': f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}",
-                'parents': [self.resume_folder_id],
-                'description': f"Resume from: {metadata.get('sender', 'Unknown')}\nSubject: {metadata.get('subject', 'No subject')}\nScore: {metadata.get('score', 'Unknown')}"
+                'name': new_filename,
+                'parents': [target_folder_id],
+                'description': f"""🎯 VLSI Resume Scanner Analysis Report
+
+📧 Email Details:
+   • From: {metadata.get('sender', 'Unknown')}
+   • Subject: {metadata.get('subject', 'No subject')}
+   • Date: {metadata.get('date', 'Unknown')}
+
+🔍 Analysis Results:
+   • Domain: {domain}
+   • Domain Score: {metadata.get('domain_score', 0):.3f}
+   • Resume Quality Score: {resume_score:.3f}
+   • Top Keywords: {top_keywords}
+
+💼 Experience Analysis:
+   • Experience Level: {experience_level}
+   • Estimated Years: {experience_years}
+   • Evidence: {experience_evidence}
+
+📁 Filing Information:
+   • Auto-filed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+   • Location: {domain} > {experience_level}
+   • File Type: {file_extension.upper()}
+
+🤖 Generated by VLSI Resume Scanner v2.1
+   Smart domain and experience-based candidate categorization."""
             }
             
+            # Determine MIME type
+            mime_types = {
+                'pdf': 'application/pdf',
+                'doc': 'application/msword', 
+                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            }
+            mime_type = mime_types.get(file_extension, 'application/octet-stream')
+            
             # Create a temporary file for upload
-            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
                 temp_file.write(file_data)
                 temp_file_path = temp_file.name
             
             try:
                 # Upload file
                 from googleapiclient.http import MediaFileUpload
-                media = MediaFileUpload(temp_file_path, mimetype='application/pdf')
+                media = MediaFileUpload(temp_file_path, mimetype=mime_type)
                 file = self.drive_service.files().create(
                     body=file_metadata,
                     media_body=media,
@@ -612,7 +980,144 @@ class VLSIResumeScanner:
                 ).execute()
                 
                 file_id = file.get('id')
-                self.add_log(f"💾 Saved to Drive: {filename} (ID: {file_id})", 'success')
+                self.add_log(f"💾 Saved to Drive: {domain}/{experience_level} - {filename} (Resume: {resume_score:.2f}, Exp: {experience_years}Y)", 'success')
+                
+                return file_id
+                
+            finally:
+                # Clean up temporary file
+                os.unlink(temp_file_path)
+            
+        except Exception as e:
+            self.add_log(f"❌ Drive save failed for {filename}: {e}", 'error')
+            return None: bytes, filename: str, metadata: Dict) -> Optional[str]:
+        """Save file to Google Drive with domain-based organization"""
+        try:
+            if not self.drive_service:
+                self.add_log("❌ Drive service not available", 'error')
+                return None
+            
+            # Get domain and scores from analysis
+            domain = metadata.get('domain', 'Unknown Domain')
+            resume_score = metadata.get('resume_score', 0)
+            domain_score = metadata.get('domain_score', 0)
+            
+            # Get domain folder ID
+            domain_folder_id = self.domain_folders.get(domain)
+            if not domain_folder_id:
+                self.add_log(f"⚠️ Domain folder not found for {domain}, using Unknown Domain", 'warning')
+                domain_folder_id = self.domain_folders.get('Unknown Domain', self.resume_folder_id)
+            
+            # Determine priority subfolder based on resume score
+            if resume_score >= 0.7:
+                priority_folder = "High Priority (0.7+)"
+                priority_label = "HIGH"
+            elif resume_score >= 0.4:
+                priority_folder = "Medium Priority (0.4-0.7)"
+                priority_label = "MEDIUM"
+            elif resume_score >= 0.1:
+                priority_folder = "Low Priority (0.1-0.4)"
+                priority_label = "LOW"
+            else:
+                priority_folder = None
+                priority_label = "UNKNOWN"
+            
+            # Find or create priority subfolder
+            target_folder_id = domain_folder_id
+            if priority_folder:
+                priority_query = f"name='{priority_folder}' and parents in '{domain_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                priority_results = self.drive_service.files().list(q=priority_query, fields="files(id, name)").execute()
+                
+                if priority_results.get('files'):
+                    target_folder_id = priority_results['files'][0]['id']
+                else:
+                    # Create priority subfolder if it doesn't exist
+                    priority_metadata = {
+                        'name': priority_folder,
+                        'parents': [domain_folder_id],
+                        'mimeType': 'application/vnd.google-apps.folder'
+                    }
+                    priority_folder_obj = self.drive_service.files().create(body=priority_metadata, fields='id').execute()
+                    target_folder_id = priority_folder_obj.get('id')
+                    self.add_log(f"✅ Created priority subfolder: {domain}/{priority_folder}", 'info')
+            
+            # Create enhanced file metadata
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            file_extension = filename.split('.')[-1].lower()
+            clean_filename = filename.replace(f'.{file_extension}', '')
+            
+            # Enhanced filename with domain and priority
+            domain_abbrev = {
+                'Physical Design': 'PD',
+                'Design Verification': 'DV', 
+                'DFT': 'DFT',
+                'RTL Design': 'RTL',
+                'Analog Design': 'ANA',
+                'FPGA': 'FPGA',
+                'Silicon Validation': 'SiVal',
+                'Mixed Signal': 'MS',
+                'General VLSI': 'VLSI',
+                'Unknown Domain': 'UNK'
+            }.get(domain, 'UNK')
+            
+            new_filename = f"[{domain_abbrev}_{priority_label}] {timestamp}_{clean_filename}.{file_extension}"
+            
+            # Get domain-specific matches for description
+            analysis_result = metadata.get('analysis_result', {})
+            domain_matches = analysis_result.get('domain_matches', {}).get(domain, [])
+            top_keywords = ', '.join(domain_matches[:5]) if domain_matches else 'No specific keywords found'
+            
+            file_metadata = {
+                'name': new_filename,
+                'parents': [target_folder_id],
+                'description': f"""🎯 VLSI Resume Scanner Analysis Report
+
+📧 Email Details:
+   • From: {metadata.get('sender', 'Unknown')}
+   • Subject: {metadata.get('subject', 'No subject')}
+   • Date: {metadata.get('date', 'Unknown')}
+
+🔍 Analysis Results:
+   • Domain: {domain}
+   • Domain Score: {domain_score:.3f}
+   • Resume Score: {resume_score:.3f}
+   • Priority: {priority_label}
+   • Top Keywords: {top_keywords}
+
+📁 Filing Information:
+   • Auto-filed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+   • Location: {domain} > {priority_folder or 'Main Folder'}
+   • File Type: {file_extension.upper()}
+
+🤖 Generated by VLSI Resume Scanner v2.0
+   Intelligent domain classification for efficient candidate screening."""
+            }
+            
+            # Determine MIME type
+            mime_types = {
+                'pdf': 'application/pdf',
+                'doc': 'application/msword', 
+                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            }
+            mime_type = mime_types.get(file_extension, 'application/octet-stream')
+            
+            # Create a temporary file for upload
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
+                temp_file.write(file_data)
+                temp_file_path = temp_file.name
+            
+            try:
+                # Upload file
+                from googleapiclient.http import MediaFileUpload
+                media = MediaFileUpload(temp_file_path, mimetype=mime_type)
+                file = self.drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id'
+                ).execute()
+                
+                file_id = file.get('id')
+                self.add_log(f"💾 Saved to Drive: {domain}/{priority_folder or 'Main'} - {filename} (Resume: {resume_score:.2f}, Domain: {domain_score:.2f})", 'success')
                 
                 return file_id
                 
@@ -629,6 +1134,8 @@ class VLSIResumeScanner:
         return {
             'google_apis_available': GOOGLE_APIS_AVAILABLE,
             'pdf_processing_available': PDF_PROCESSING_AVAILABLE,
+            'docx_processing_available': DOCX_PROCESSING_AVAILABLE,
+            'doc_processing_available': DOC_PROCESSING_AVAILABLE,
             'credentials_file_exists': os.path.exists('credentials.json'),
             'token_file_exists': os.path.exists('token.json'),
             'gmail_service_active': self.gmail_service is not None,
@@ -638,6 +1145,13 @@ class VLSIResumeScanner:
             'env_project_id': bool(os.environ.get('GOOGLE_PROJECT_ID')),
             'client_id_preview': os.environ.get('GOOGLE_CLIENT_ID', '')[:20] + '...' if os.environ.get('GOOGLE_CLIENT_ID') else None,
             'project_id_value': os.environ.get('GOOGLE_PROJECT_ID'),
+            'domain_folders_setup': all(folder_id is not None for folder_id in self.domain_folders.values()),
+            'supported_formats': ['PDF', 'DOC', 'DOCX'],
+            'supported_domains': list(self.domain_folders.keys()),
+            'main_folders_ready': all([
+                self.resume_folder_id,
+                self.processed_folder_id
+            ]),
             'stats': self.stats,
             'recent_logs': self.logs[-10:] if self.logs else []
         }
@@ -791,6 +1305,28 @@ def index():
                         <button onclick="scanGmail()" style="background: #007bff;">📧 Full Gmail Scan</button>
                         <button onclick="quickScan()" style="background: #28a745;">⚡ Quick Scan (Last 50)</button>
                         <button onclick="testSystem()" style="background: #6c757d;">🔍 Test System</button>
+                        <button onclick="showUserManager()" style="background: #fd7e14;">👥 Manage Team Access</button>
+                    </div>
+
+                    <div id="user-manager" style="display: none; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                        <h3 style="color: #1976d2; margin: 0 0 15px 0;">👥 Team Member Authentication</h3>
+                        <p style="color: #1976d2; margin: 0 0 15px 0;">
+                            Team members can authenticate with their own Gmail accounts for personalized access.
+                        </p>
+                        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                            <input type="email" id="user-email-input" placeholder="team-member@gmail.com" 
+                                   style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                            <button onclick="authenticateUser()" style="padding: 10px 20px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                Add Team Member
+                            </button>
+                        </div>
+                        <div id="authenticated-users" style="background: white; border-radius: 4px; padding: 10px;">
+                            <strong>Authenticated Users:</strong>
+                            <div id="user-list">Loading...</div>
+                        </div>
+                        <button onclick="hideUserManager()" style="margin-top: 10px; padding: 8px 16px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Close
+                        </button>
                     </div>
 
                     <div id="oauth-input" style="display: none; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 20px 0;">
@@ -890,6 +1426,53 @@ def index():
         function hideOAuthInput() {
             document.getElementById('oauth-input').style.display = 'none';
             document.getElementById('oauth-code-input').value = '';
+        }
+
+        function showUserManager() {
+            document.getElementById('user-manager').style.display = 'block';
+            loadAuthenticatedUsers();
+        }
+
+        function hideUserManager() {
+            document.getElementById('user-manager').style.display = 'none';
+        }
+
+        function authenticateUser() {
+            const email = document.getElementById('user-email-input').value.trim();
+            
+            if (!email) {
+                addLogToDisplay('❌ Please enter a valid email address', 'error');
+                return;
+            }
+            
+            if (!email.includes('@')) {
+                addLogToDisplay('❌ Please enter a valid email address', 'error');
+                return;
+            }
+            
+            addLogToDisplay(`🔐 Starting authentication for ${email}...`, 'info');
+            
+            fetch('/api/setup-gmail', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_email: email })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    addLogToDisplay('✅ ' + data.message, 'success');
+                    hideOAuthInput();
+                    hideUserManager();
+                } else {
+                    addLogToDisplay('❌ ' + data.message, 'error');
+                    if (data.message.includes('authentication failed')) {
+                        setTimeout(showOAuthInput, 1000);
+                    }
+                }
+            })
+            .catch(e => {
+                addLogToDisplay('❌ Authentication failed: ' + e.message, 'error');
+            });
         }
 
         function submitOAuthCode() {
@@ -1126,7 +1709,13 @@ def api_auth():
 def api_setup_gmail():
     """Setup Gmail API authentication"""
     try:
-        scanner.add_log("Starting Gmail API setup...", 'info')
+        data = request.get_json() or {}
+        user_email = data.get('user_email')
+        
+        if user_email:
+            scanner.add_log(f"Starting Gmail API setup for {user_email}...", 'info')
+        else:
+            scanner.add_log("Starting Gmail API setup...", 'info')
         
         # Check if Google APIs are available
         if not GOOGLE_APIS_AVAILABLE:
@@ -1153,7 +1742,7 @@ def api_setup_gmail():
             return jsonify({'status': 'error', 'message': error_msg})
         
         # Try to authenticate
-        if scanner.authenticate_google_apis():
+        if scanner.authenticate_google_apis(user_email):
             if scanner.setup_drive_folders():
                 scanner.add_log("✅ Gmail and Drive setup completed successfully", 'success')
                 return jsonify({'status': 'success', 'message': 'Gmail integration setup completed'})
@@ -1170,6 +1759,18 @@ def api_setup_gmail():
         error_msg = f"Setup failed with exception: {str(e)}"
         scanner.add_log(error_msg, 'error')
         return jsonify({'status': 'error', 'message': error_msg})
+
+@app.route('/api/users')
+@admin_required
+def api_users():
+    """Get list of authenticated users"""
+    try:
+        users = list(scanner.user_credentials.keys())
+        if scanner.current_user_email and scanner.current_user_email not in users:
+            users.append(scanner.current_user_email)
+        return jsonify({'users': users})
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 @app.route('/api/oauth-code', methods=['POST'])
 @admin_required
@@ -1202,11 +1803,27 @@ def api_oauth_code():
             
             scanner.add_log("✅ Successfully obtained OAuth tokens", 'success')
             
-            # Save credentials for next run
+            # Save credentials for next run with user-specific filename
             try:
-                with open('token.json', 'w') as token:
-                    token.write(creds.to_json())
-                scanner.add_log("💾 Saved authentication token", 'success')
+                # Get user email from new credentials
+                temp_gmail_service = build('gmail', 'v1', credentials=creds)
+                profile = temp_gmail_service.users().getProfile(userId='me').execute()
+                user_email = profile.get('emailAddress')
+                
+                # Save with user-specific filename
+                if user_email:
+                    token_filename = f'token_{user_email.replace("@", "_").replace(".", "_")}.json'
+                    with open(token_filename, 'w') as token:
+                        token.write(creds.to_json())
+                    scanner.add_log(f"💾 Saved authentication token for {user_email}", 'success')
+                    
+                    # Also save as default token for backward compatibility
+                    with open('token.json', 'w') as token:
+                        token.write(creds.to_json())
+                else:
+                    with open('token.json', 'w') as token:
+                        token.write(creds.to_json())
+                    scanner.add_log("💾 Saved authentication token", 'success')
             except Exception as e:
                 scanner.add_log(f"⚠️ Warning: Could not save token: {e}", 'warning')
             
