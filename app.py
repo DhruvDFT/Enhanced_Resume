@@ -1,4 +1,709 @@
-def get_system_status(self) -> Dict[str, Any]:
+import os
+import json
+import logging
+import re
+import base64
+import time
+import tempfile
+from datetime import datetime
+from typing import Dict, Any, Optional
+from flask import Flask, render_template_string, request, jsonify, session
+
+# Try to import Google API libraries
+try:
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from googleapiclient.discovery import build
+    GOOGLE_APIS_AVAILABLE = True
+except ImportError:
+    GOOGLE_APIS_AVAILABLE = False
+
+# Try to import PDF processing
+try:
+    import PyPDF2
+    PDF_PROCESSING_AVAILABLE = True
+except ImportError:
+    try:
+        import pdfplumber
+        PDF_PROCESSING_AVAILABLE = True
+    except ImportError:
+        PDF_PROCESSING_AVAILABLE = False
+
+# Try to import DOC processing
+try:
+    from docx import Document
+    DOCX_PROCESSING_AVAILABLE = True
+except ImportError:
+    DOCX_PROCESSING_AVAILABLE = False
+
+try:
+    import docx2txt
+    DOC_PROCESSING_AVAILABLE = True
+except ImportError:
+    DOC_PROCESSING_AVAILABLE = False
+
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'vlsi-scanner-secret-key-2024')
+
+# Configuration
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/drive.file'
+]
+
+logging.basicConfig(level=logging.INFO)
+
+class VLSIResumeScanner:
+    def __init__(self):
+        self.credentials = None
+        self.gmail_service = None
+        self.drive_service = None
+        self.logs = []
+        self.max_logs = 1000
+        self.stats = {
+            'total_emails': 0,
+            'resumes_found': 0,
+            'last_scan_time': None,
+            'processing_errors': 0
+        }
+        self.resume_folder_id = None
+        self.processed_folder_id = None
+        self.domain_folders = {
+            'Physical Design': None,
+            'Design Verification': None, 
+            'DFT': None,
+            'RTL Design': None,
+            'Analog Design': None,
+            'FPGA': None,
+            'Silicon Validation': None,
+            'Mixed Signal': None,
+            'General VLSI': None,
+            'Unknown Domain': None
+        }
+        self.current_user_email = None
+        self.user_credentials = {}
+        self._oauth_flow = None
+        
+    def add_log(self, message: str, level: str = 'info'):
+        """Add a log entry with timestamp"""
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        log_entry = {
+            'timestamp': timestamp,
+            'level': level,
+            'message': message
+        }
+        self.logs.append(log_entry)
+        
+        if len(self.logs) > self.max_logs:
+            self.logs = self.logs[-self.max_logs:]
+        
+        if level == 'error':
+            logging.error(f"[{timestamp}] {message}")
+        elif level == 'warning':
+            logging.warning(f"[{timestamp}] {message}")
+        else:
+            logging.info(f"[{timestamp}] {message}")
+
+    def authenticate_google_apis(self, user_email: str = None) -> bool:
+        """Authenticate with Google APIs"""
+        try:
+            creds = None
+            
+            # Try to load existing token
+            token_file = 'token.json'
+            if user_email:
+                token_file = f'token_{user_email.replace("@", "_").replace(".", "_")}.json'
+            
+            if os.path.exists(token_file):
+                try:
+                    creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+                    self.add_log(f"🔐 Loaded existing token", 'info')
+                except Exception as e:
+                    self.add_log(f"⚠️ Could not load token: {e}", 'warning')
+            
+            # If credentials are invalid, start OAuth flow
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    try:
+                        creds.refresh(Request())
+                        self.add_log("🔄 Refreshed expired token", 'info')
+                    except Exception as e:
+                        self.add_log(f"❌ Token refresh failed: {e}", 'error')
+                        creds = None
+                
+                if not creds:
+                    return self._run_oauth_flow(user_email)
+            
+            # Test the credentials
+            self.credentials = creds
+            return self._test_credentials()
+            
+        except Exception as e:
+            self.add_log(f"❌ Authentication failed: {e}", 'error')
+            return False
+
+    def _run_oauth_flow(self, user_email: str = None) -> bool:
+        """Run OAuth flow for new authentication"""
+        try:
+            # Get credentials from environment variables
+            client_id = os.environ.get('GOOGLE_CLIENT_ID')
+            client_secret = os.environ.get('GOOGLE_CLIENT_SECRET')
+            project_id = os.environ.get('GOOGLE_PROJECT_ID')
+            
+            if not all([client_id, client_secret, project_id]):
+                self.add_log("❌ Missing OAuth credentials in environment variables", 'error')
+                return False
+            
+            credentials_dict = {
+                "installed": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost"]
+                }
+            }
+            
+            # Create OAuth flow
+            flow = InstalledAppFlow.from_client_config(
+                credentials_dict, 
+                SCOPES,
+                redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+            )
+            
+            self._oauth_flow = flow
+            
+            # Generate auth URL
+            auth_url, _ = flow.authorization_url(
+                access_type='offline',
+                prompt='select_account',
+                include_granted_scopes='true'
+            )
+            
+            self.add_log("🌐 OAuth authorization required", 'info')
+            self.add_log(f"📋 Authorization URL: {auth_url}", 'info')
+            self.add_log("1️⃣ Copy the URL above and open in browser", 'info')
+            self.add_log("2️⃣ Select your Gmail account", 'info')
+            self.add_log("3️⃣ Complete Google authorization", 'info')
+            self.add_log("4️⃣ Copy the authorization code", 'info')
+            self.add_log("5️⃣ Enter it in the form below", 'info')
+            
+            return False  # Indicates manual intervention needed
+            
+        except Exception as e:
+            self.add_log(f"❌ OAuth flow failed: {e}", 'error')
+            return False
+
+    def _test_credentials(self) -> bool:
+        """Test the credentials by making API calls"""
+        try:
+            self.gmail_service = build('gmail', 'v1', credentials=self.credentials)
+            result = self.gmail_service.users().getProfile(userId='me').execute()
+            email = result.get('emailAddress', 'Unknown')
+            self.add_log(f"✅ Gmail access confirmed for: {email}", 'success')
+            
+            self.drive_service = build('drive', 'v3', credentials=self.credentials)
+            about = self.drive_service.about().get(fields='user').execute()
+            drive_email = about.get('user', {}).get('emailAddress', 'Unknown')
+            self.add_log(f"✅ Drive access confirmed for: {drive_email}", 'success')
+            
+            # Save credentials
+            with open('token.json', 'w') as token:
+                token.write(self.credentials.to_json())
+            self.add_log("💾 Saved authentication token", 'success')
+            
+            self.current_user_email = email
+            self.user_credentials[email] = self.credentials
+            
+            return True
+            
+        except Exception as e:
+            self.add_log(f"❌ Credential test failed: {e}", 'error')
+            return False
+
+    def setup_drive_folders(self) -> bool:
+        """Create necessary folders in Google Drive"""
+        try:
+            if not self.drive_service:
+                return False
+            
+            self.add_log("📁 Setting up Drive folders", 'info')
+            
+            # Create main folder
+            query = "name='VLSI Resume Scanner' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
+            
+            if results.get('files'):
+                parent_folder_id = results['files'][0]['id']
+                self.add_log("✅ Found existing parent folder", 'success')
+            else:
+                parent_metadata = {
+                    'name': 'VLSI Resume Scanner',
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                parent_folder = self.drive_service.files().create(body=parent_metadata, fields='id').execute()
+                parent_folder_id = parent_folder.get('id')
+                self.add_log("✅ Created parent folder", 'success')
+            
+            # Create resumes folder
+            resume_query = f"name='Resumes by Domain' and parents in '{parent_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            resume_results = self.drive_service.files().list(q=resume_query, fields="files(id, name)").execute()
+            
+            if resume_results.get('files'):
+                self.resume_folder_id = resume_results['files'][0]['id']
+                self.add_log("✅ Found existing Resumes folder", 'success')
+            else:
+                resume_metadata = {
+                    'name': 'Resumes by Domain',
+                    'parents': [parent_folder_id],
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                resume_folder = self.drive_service.files().create(body=resume_metadata, fields='id').execute()
+                self.resume_folder_id = resume_folder.get('id')
+                self.add_log("✅ Created Resumes folder", 'success')
+            
+            # Create domain folders
+            domains = ['Physical Design', 'Design Verification', 'DFT', 'RTL Design', 'Analog Design', 'FPGA', 'Silicon Validation', 'Mixed Signal', 'General VLSI', 'Unknown Domain']
+            
+            for domain in domains:
+                folder_query = f"name='{domain}' and parents in '{self.resume_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                folder_results = self.drive_service.files().list(q=folder_query, fields="files(id, name)").execute()
+                
+                if folder_results.get('files'):
+                    self.domain_folders[domain] = folder_results['files'][0]['id']
+                    self.add_log(f"✅ Found folder: {domain}", 'success')
+                else:
+                    folder_metadata = {
+                        'name': domain,
+                        'parents': [self.resume_folder_id],
+                        'mimeType': 'application/vnd.google-apps.folder'
+                    }
+                    folder = self.drive_service.files().create(body=folder_metadata, fields='id').execute()
+                    self.domain_folders[domain] = folder.get('id')
+                    self.add_log(f"✅ Created folder: {domain}", 'success')
+                    
+                    # Create experience subfolders
+                    for exp_level in ['Fresher (0-2 years)', 'Mid-Level (2-5 years)', 'Senior (5-8 years)', 'Experienced (8+ years)']:
+                        exp_metadata = {
+                            'name': exp_level,
+                            'parents': [folder.get('id')],
+                            'mimeType': 'application/vnd.google-apps.folder'
+                        }
+                        self.drive_service.files().create(body=exp_metadata, fields='id').execute()
+            
+            return True
+            
+        except Exception as e:
+            self.add_log(f"❌ Drive setup failed: {e}", 'error')
+            return False
+
+    def scan_emails(self, max_results: int = None) -> Dict[str, Any]:
+        """Scan Gmail for resume attachments"""
+        try:
+            if not self.gmail_service:
+                return {'success': False, 'error': 'Gmail service not available'}
+            
+            self.add_log(f"🔍 Starting Gmail scan", 'info')
+            
+            # Search for emails with attachments
+            query = 'has:attachment (filename:pdf OR filename:doc OR filename:docx)'
+            if max_results:
+                query += f' newer_than:30d'
+            
+            result = self.gmail_service.users().messages().list(
+                userId='me',
+                q=query,
+                maxResults=min(50, max_results or 50)
+            ).execute()
+            
+            messages = result.get('messages', [])
+            self.add_log(f"📧 Found {len(messages)} emails with attachments", 'info')
+            
+            resumes_found = 0
+            processed_count = 0
+            
+            for i, message in enumerate(messages, 1):
+                try:
+                    self.add_log(f"📨 Processing email {i}/{len(messages)}", 'info')
+                    result = self.process_email(message['id'])
+                    
+                    if result.get('has_resume'):
+                        resumes_found += 1
+                        
+                    processed_count += 1
+                    
+                    if i % 5 == 0:
+                        time.sleep(1)  # Rate limiting
+                        
+                except Exception as e:
+                    self.add_log(f"❌ Error processing email {i}: {e}", 'error')
+                    self.stats['processing_errors'] += 1
+                    continue
+            
+            # Update stats
+            self.stats['total_emails'] = processed_count
+            self.stats['resumes_found'] = resumes_found
+            self.stats['last_scan_time'] = datetime.now().isoformat()
+            
+            self.add_log(f"✅ Scan completed: {processed_count} emails, {resumes_found} resumes", 'success')
+            
+            return {
+                'success': True,
+                'processed': processed_count,
+                'resumes_found': resumes_found,
+                'stats': self.stats
+            }
+            
+        except Exception as e:
+            self.add_log(f"❌ Email scan failed: {e}", 'error')
+            return {'success': False, 'error': str(e)}
+
+    def process_email(self, message_id: str) -> Dict[str, Any]:
+        """Process a single email for resume attachments"""
+        try:
+            message = self.gmail_service.users().messages().get(userId='me', id=message_id).execute()
+            
+            headers = message['payload'].get('headers', [])
+            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
+            date_header = next((h['value'] for h in headers if h['name'] == 'Date'), '')
+            
+            # Check for attachments
+            attachments = []
+            if 'parts' in message['payload']:
+                for part in message['payload']['parts']:
+                    filename = part.get('filename', '').lower()
+                    if filename and (filename.endswith('.pdf') or filename.endswith('.doc') or filename.endswith('.docx')):
+                        if 'body' in part and 'attachmentId' in part['body']:
+                            attachments.append({
+                                'filename': part['filename'],
+                                'attachment_id': part['body']['attachmentId'],
+                                'size': part['body'].get('size', 0),
+                                'type': 'pdf' if filename.endswith('.pdf') else 'doc'
+                            })
+            
+            has_resume = False
+            processed_attachments = []
+            
+            for attachment in attachments:
+                try:
+                    # Download attachment
+                    att = self.gmail_service.users().messages().attachments().get(
+                        userId='me',
+                        messageId=message_id,
+                        id=attachment['attachment_id']
+                    ).execute()
+                    
+                    data = base64.urlsafe_b64decode(att['data'])
+                    
+                    # Analyze content
+                    analysis_result = self.analyze_content(data, attachment['filename'])
+                    
+                    if analysis_result and analysis_result.get('is_resume', False):
+                        has_resume = True
+                        
+                        # Save to Drive
+                        drive_file_id = self.save_to_drive(
+                            data,
+                            attachment['filename'],
+                            {
+                                'subject': subject,
+                                'sender': sender,
+                                'date': date_header,
+                                'analysis_result': analysis_result
+                            }
+                        )
+                        
+                        processed_attachments.append({
+                            'filename': attachment['filename'],
+                            'domain': analysis_result.get('domain', 'Unknown Domain'),
+                            'experience': analysis_result.get('experience_level', 'Unknown'),
+                            'score': analysis_result.get('resume_score', 0),
+                            'drive_file_id': drive_file_id
+                        })
+                        
+                        self.add_log(f"✅ Resume: {attachment['filename']} | {analysis_result.get('domain', 'Unknown')} | {analysis_result.get('experience_level', 'Unknown')}", 'success')
+                    
+                except Exception as e:
+                    self.add_log(f"❌ Error processing {attachment['filename']}: {e}", 'error')
+                    continue
+            
+            return {
+                'message_id': message_id,
+                'subject': subject,
+                'sender': sender,
+                'date': date_header,
+                'has_resume': has_resume,
+                'attachments': processed_attachments
+            }
+            
+        except Exception as e:
+            self.add_log(f"❌ Error processing email {message_id}: {e}", 'error')
+            return {'message_id': message_id, 'error': str(e)}
+
+    def analyze_content(self, file_data: bytes, filename: str) -> Dict[str, Any]:
+        """Analyze file content to determine if it's a resume and categorize it"""
+        try:
+            text = ""
+            
+            # Extract text based on file type
+            if filename.lower().endswith('.pdf'):
+                text = self.extract_pdf_text(file_data)
+            elif filename.lower().endswith('.docx'):
+                text = self.extract_docx_text(file_data, filename)
+            elif filename.lower().endswith('.doc'):
+                text = self.extract_doc_text(file_data, filename)
+            
+            if not text:
+                return {'is_resume': False, 'domain': 'Unknown Domain', 'experience_level': 'Unknown', 'resume_score': 0}
+            
+            # Analyze text for resume indicators
+            text_lower = text.lower()
+            
+            # Basic resume detection
+            resume_indicators = ['experience', 'education', 'skills', 'resume', 'cv', 'work', 'employment', 'career']
+            resume_score = sum(1 for indicator in resume_indicators if indicator in text_lower)
+            
+            if resume_score < 3:
+                return {'is_resume': False, 'domain': 'Unknown Domain', 'experience_level': 'Unknown', 'resume_score': 0}
+            
+            # Domain classification
+            domain_keywords = {
+                'Physical Design': ['physical design', 'place and route', 'floorplanning', 'sta', 'primetime', 'innovus', 'icc'],
+                'Design Verification': ['verification', 'uvm', 'systemverilog', 'testbench', 'coverage', 'questa', 'vcs'],
+                'DFT': ['dft', 'scan', 'atpg', 'bist', 'test', 'tessent'],
+                'RTL Design': ['rtl', 'verilog', 'synthesis', 'design compiler'],
+                'Analog Design': ['analog', 'adc', 'dac', 'pll', 'opamp', 'spice'],
+                'FPGA': ['fpga', 'xilinx', 'vivado', 'quartus'],
+                'Silicon Validation': ['validation', 'silicon', 'post silicon', 'bring up'],
+                'Mixed Signal': ['mixed signal', 'serdes', 'high speed']
+            }
+            
+            domain_scores = {}
+            for domain, keywords in domain_keywords.items():
+                score = sum(1 for keyword in keywords if keyword in text_lower)
+                domain_scores[domain] = score
+            
+            # Determine primary domain
+            if domain_scores:
+                primary_domain = max(domain_scores.items(), key=lambda x: x[1])
+                domain = primary_domain[0] if primary_domain[1] > 0 else 'General VLSI'
+            else:
+                domain = 'Unknown Domain'
+            
+            # Experience level detection
+            experience_years = 0
+            year_patterns = [r'(\d+)\s*years?\s*(?:of\s*)?(?:experience|exp)', r'(\d+)\+?\s*yrs?']
+            
+            for pattern in year_patterns:
+                matches = re.findall(pattern, text_lower)
+                for match in matches:
+                    years = int(match)
+                    if years > experience_years:
+                        experience_years = years
+            
+            # Categorize experience
+            if experience_years <= 2:
+                experience_level = 'Fresher (0-2 years)'
+            elif experience_years <= 5:
+                experience_level = 'Mid-Level (2-5 years)'
+            elif experience_years <= 8:
+                experience_level = 'Senior (5-8 years)'
+            else:
+                experience_level = 'Experienced (8+ years)'
+            
+            return {
+                'is_resume': True,
+                'domain': domain,
+                'experience_level': experience_level,
+                'experience_years': experience_years,
+                'resume_score': min(resume_score / 10.0, 1.0)
+            }
+            
+        except Exception as e:
+            self.add_log(f"❌ Error analyzing {filename}: {e}", 'error')
+            return {'is_resume': False, 'domain': 'Unknown Domain', 'experience_level': 'Unknown', 'resume_score': 0}
+
+    def extract_pdf_text(self, pdf_data: bytes) -> str:
+        """Extract text from PDF"""
+        try:
+            if not PDF_PROCESSING_AVAILABLE:
+                return ""
+            
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
+                temp_file.write(pdf_data)
+                temp_file_path = temp_file.name
+            
+            try:
+                try:
+                    import pdfplumber
+                    with pdfplumber.open(temp_file_path) as pdf:
+                        text = ""
+                        for page in pdf.pages:
+                            page_text = page.extract_text()
+                            if page_text:
+                                text += page_text + "\n"
+                    return text
+                except ImportError:
+                    import PyPDF2
+                    with open(temp_file_path, 'rb') as file:
+                        pdf_reader = PyPDF2.PdfReader(file)
+                        text = ""
+                        for page in pdf_reader.pages:
+                            text += page.extract_text() + "\n"
+                    return text
+            finally:
+                os.unlink(temp_file_path)
+                
+        except Exception as e:
+            self.add_log(f"❌ PDF extraction failed: {e}", 'error')
+            return ""
+
+    def extract_docx_text(self, doc_data: bytes, filename: str) -> str:
+        """Extract text from DOCX"""
+        try:
+            if not DOCX_PROCESSING_AVAILABLE:
+                return ""
+            
+            with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as temp_file:
+                temp_file.write(doc_data)
+                temp_file_path = temp_file.name
+            
+            try:
+                doc = Document(temp_file_path)
+                text = ""
+                for paragraph in doc.paragraphs:
+                    text += paragraph.text + "\n"
+                return text
+            finally:
+                os.unlink(temp_file_path)
+                
+        except Exception as e:
+            self.add_log(f"❌ DOCX extraction failed: {e}", 'error')
+            return ""
+
+    def extract_doc_text(self, doc_data: bytes, filename: str) -> str:
+        """Extract text from DOC"""
+        try:
+            if not DOC_PROCESSING_AVAILABLE:
+                return ""
+            
+            with tempfile.NamedTemporaryFile(suffix='.doc', delete=False) as temp_file:
+                temp_file.write(doc_data)
+                temp_file_path = temp_file.name
+            
+            try:
+                import docx2txt
+                text = docx2txt.process(temp_file_path)
+                return text
+            finally:
+                os.unlink(temp_file_path)
+                
+        except Exception as e:
+            self.add_log(f"❌ DOC extraction failed: {e}", 'error')
+            return ""
+
+    def save_to_drive(self, file_data: bytes, filename: str, metadata: Dict) -> Optional[str]:
+        """Save file to Google Drive with domain and experience organization"""
+        try:
+            if not self.drive_service:
+                return None
+            
+            analysis = metadata.get('analysis_result', {})
+            domain = analysis.get('domain', 'Unknown Domain')
+            experience_level = analysis.get('experience_level', 'Unknown')
+            experience_years = analysis.get('experience_years', 0)
+            
+            # Get domain folder
+            domain_folder_id = self.domain_folders.get(domain, self.domain_folders.get('Unknown Domain'))
+            
+            # Find experience subfolder
+            exp_folder_query = f"name='{experience_level}' and parents in '{domain_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            exp_results = self.drive_service.files().list(q=exp_folder_query, fields="files(id, name)").execute()
+            
+            if exp_results.get('files'):
+                target_folder_id = exp_results['files'][0]['id']
+            else:
+                # Create experience subfolder
+                exp_metadata = {
+                    'name': experience_level,
+                    'parents': [domain_folder_id],
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                exp_folder = self.drive_service.files().create(body=exp_metadata, fields='id').execute()
+                target_folder_id = exp_folder.get('id')
+            
+            # Create enhanced filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            file_extension = filename.split('.')[-1].lower()
+            clean_filename = filename.replace(f'.{file_extension}', '')
+            
+            domain_abbrev = {
+                'Physical Design': 'PD', 'Design Verification': 'DV', 'DFT': 'DFT',
+                'RTL Design': 'RTL', 'Analog Design': 'ANA', 'FPGA': 'FPGA',
+                'Silicon Validation': 'SiVal', 'Mixed Signal': 'MS',
+                'General VLSI': 'VLSI', 'Unknown Domain': 'UNK'
+            }.get(domain, 'UNK')
+            
+            exp_abbrev = {
+                'Fresher (0-2 years)': 'FR', 'Mid-Level (2-5 years)': 'ML',
+                'Senior (5-8 years)': 'SR', 'Experienced (8+ years)': 'EX'
+            }.get(experience_level, 'UK')
+            
+            new_filename = f"[{domain_abbrev}_{exp_abbrev}_{experience_years}Y] {timestamp}_{clean_filename}.{file_extension}"
+            
+            file_metadata = {
+                'name': new_filename,
+                'parents': [target_folder_id],
+                'description': f"""VLSI Resume Scanner Analysis
+
+Email: {metadata.get('sender', 'Unknown')}
+Subject: {metadata.get('subject', 'No subject')}
+Date: {metadata.get('date', 'Unknown')}
+
+Domain: {domain}
+Experience: {experience_level} ({experience_years} years)
+Score: {analysis.get('resume_score', 0):.2f}
+
+Auto-filed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Location: {domain} > {experience_level}"""
+            }
+            
+            # Upload file
+            mime_types = {
+                'pdf': 'application/pdf',
+                'doc': 'application/msword',
+                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            }
+            mime_type = mime_types.get(file_extension, 'application/octet-stream')
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
+                temp_file.write(file_data)
+                temp_file_path = temp_file.name
+            
+            try:
+                from googleapiclient.http import MediaFileUpload
+                media = MediaFileUpload(temp_file_path, mimetype=mime_type)
+                file = self.drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id'
+                ).execute()
+                
+                file_id = file.get('id')
+                self.add_log(f"💾 Saved: {domain}/{experience_level} - {filename}", 'success')
+                return file_id
+                
+            finally:
+                os.unlink(temp_file_path)
+            
+        except Exception as e:
+            self.add_log(f"❌ Save failed for {filename}: {e}", 'error')
+            return None
+
+    def get_system_status(self) -> Dict[str, Any]:
         """Get current system status"""
         return {
             'google_apis_available': GOOGLE_APIS_AVAILABLE,
@@ -695,711 +1400,4 @@ def api_logs():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)import os
-import json
-import logging
-import re
-import base64
-import time
-import tempfile
-from datetime import datetime
-from typing import Dict, Any, Optional
-from flask import Flask, render_template_string, request, jsonify, session
-
-# Try to import Google API libraries
-try:
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    from googleapiclient.discovery import build
-    GOOGLE_APIS_AVAILABLE = True
-except ImportError:
-    GOOGLE_APIS_AVAILABLE = False
-
-# Try to import PDF processing
-try:
-    import PyPDF2
-    PDF_PROCESSING_AVAILABLE = True
-except ImportError:
-    try:
-        import pdfplumber
-        PDF_PROCESSING_AVAILABLE = True
-    except ImportError:
-        PDF_PROCESSING_AVAILABLE = False
-
-# Try to import DOC processing
-try:
-    from docx import Document
-    DOCX_PROCESSING_AVAILABLE = True
-except ImportError:
-    DOCX_PROCESSING_AVAILABLE = False
-
-try:
-    import docx2txt
-    DOC_PROCESSING_AVAILABLE = True
-except ImportError:
-    DOC_PROCESSING_AVAILABLE = False
-
-app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'vlsi-scanner-secret-key-2024')
-
-# Configuration
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
-SCOPES = [
-    'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/drive.file'
-]
-
-logging.basicConfig(level=logging.INFO)
-
-class VLSIResumeScanner:
-    def __init__(self):
-        self.credentials = None
-        self.gmail_service = None
-        self.drive_service = None
-        self.logs = []
-        self.max_logs = 1000
-        self.stats = {
-            'total_emails': 0,
-            'resumes_found': 0,
-            'last_scan_time': None,
-            'processing_errors': 0
-        }
-        self.resume_folder_id = None
-        self.processed_folder_id = None
-        self.domain_folders = {
-            'Physical Design': None,
-            'Design Verification': None, 
-            'DFT': None,
-            'RTL Design': None,
-            'Analog Design': None,
-            'FPGA': None,
-            'Silicon Validation': None,
-            'Mixed Signal': None,
-            'General VLSI': None,
-            'Unknown Domain': None
-        }
-        self.current_user_email = None
-        self.user_credentials = {}
-        
-    def add_log(self, message: str, level: str = 'info'):
-        """Add a log entry with timestamp"""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        log_entry = {
-            'timestamp': timestamp,
-            'level': level,
-            'message': message
-        }
-        self.logs.append(log_entry)
-        
-        if len(self.logs) > self.max_logs:
-            self.logs = self.logs[-self.max_logs:]
-        
-        if level == 'error':
-            logging.error(f"[{timestamp}] {message}")
-        elif level == 'warning':
-            logging.warning(f"[{timestamp}] {message}")
-        else:
-            logging.info(f"[{timestamp}] {message}")
-
-    def authenticate_google_apis(self, user_email: str = None) -> bool:
-        """Authenticate with Google APIs"""
-        try:
-            creds = None
-            
-            # Try to load existing token
-            token_file = 'token.json'
-            if user_email:
-                token_file = f'token_{user_email.replace("@", "_").replace(".", "_")}.json'
-            
-            if os.path.exists(token_file):
-                try:
-                    creds = Credentials.from_authorized_user_file(token_file, SCOPES)
-                    self.add_log(f"🔐 Loaded existing token", 'info')
-                except Exception as e:
-                    self.add_log(f"⚠️ Could not load token: {e}", 'warning')
-            
-            # If credentials are invalid, start OAuth flow
-            if not creds or not creds.valid:
-                if creds and creds.expired and creds.refresh_token:
-                    try:
-                        creds.refresh(Request())
-                        self.add_log("🔄 Refreshed expired token", 'info')
-                    except Exception as e:
-                        self.add_log(f"❌ Token refresh failed: {e}", 'error')
-                        creds = None
-                
-                if not creds:
-                    return self._run_oauth_flow(user_email)
-            
-            # Test the credentials
-            self.credentials = creds
-            return self._test_credentials()
-            
-        except Exception as e:
-            self.add_log(f"❌ Authentication failed: {e}", 'error')
-            return False
-
-    def _run_oauth_flow(self, user_email: str = None) -> bool:
-        """Run OAuth flow for new authentication"""
-        try:
-            # Get credentials from environment variables
-            client_id = os.environ.get('GOOGLE_CLIENT_ID')
-            client_secret = os.environ.get('GOOGLE_CLIENT_SECRET')
-            project_id = os.environ.get('GOOGLE_PROJECT_ID')
-            
-            if not all([client_id, client_secret, project_id]):
-                self.add_log("❌ Missing OAuth credentials in environment variables", 'error')
-                return False
-            
-            credentials_dict = {
-                "installed": {
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost"]
-                }
-            }
-            
-            # Create OAuth flow
-            flow = InstalledAppFlow.from_client_config(
-                credentials_dict, 
-                SCOPES,
-                redirect_uri='urn:ietf:wg:oauth:2.0:oob'
-            )
-            
-            self._oauth_flow = flow
-            
-            # Generate auth URL
-            auth_url, _ = flow.authorization_url(
-                access_type='offline',
-                prompt='select_account',
-                include_granted_scopes='true'
-            )
-            
-            self.add_log("🌐 OAuth authorization required", 'info')
-            self.add_log(f"📋 Authorization URL: {auth_url}", 'info')
-            self.add_log("1️⃣ Copy the URL above and open in browser", 'info')
-            self.add_log("2️⃣ Select your Gmail account", 'info')
-            self.add_log("3️⃣ Complete Google authorization", 'info')
-            self.add_log("4️⃣ Copy the authorization code", 'info')
-            self.add_log("5️⃣ Enter it in the form below", 'info')
-            
-            return False  # Indicates manual intervention needed
-            
-        except Exception as e:
-            self.add_log(f"❌ OAuth flow failed: {e}", 'error')
-            return False
-
-    def _test_credentials(self) -> bool:
-        """Test the credentials by making API calls"""
-        try:
-            self.gmail_service = build('gmail', 'v1', credentials=self.credentials)
-            result = self.gmail_service.users().getProfile(userId='me').execute()
-            email = result.get('emailAddress', 'Unknown')
-            self.add_log(f"✅ Gmail access confirmed for: {email}", 'success')
-            
-            self.drive_service = build('drive', 'v3', credentials=self.credentials)
-            about = self.drive_service.about().get(fields='user').execute()
-            drive_email = about.get('user', {}).get('emailAddress', 'Unknown')
-            self.add_log(f"✅ Drive access confirmed for: {drive_email}", 'success')
-            
-            # Save credentials
-            with open('token.json', 'w') as token:
-                token.write(self.credentials.to_json())
-            self.add_log("💾 Saved authentication token", 'success')
-            
-            self.current_user_email = email
-            self.user_credentials[email] = self.credentials
-            
-            return True
-            
-        except Exception as e:
-            self.add_log(f"❌ Credential test failed: {e}", 'error')
-            return False
-
-    def setup_drive_folders(self) -> bool:
-        """Create necessary folders in Google Drive"""
-        try:
-            if not self.drive_service:
-                return False
-            
-            self.add_log("📁 Setting up Drive folders", 'info')
-            
-            # Create main folder
-            query = "name='VLSI Resume Scanner' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-            results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
-            
-            if results.get('files'):
-                parent_folder_id = results['files'][0]['id']
-                self.add_log("✅ Found existing parent folder", 'success')
-            else:
-                parent_metadata = {
-                    'name': 'VLSI Resume Scanner',
-                    'mimeType': 'application/vnd.google-apps.folder'
-                }
-                parent_folder = self.drive_service.files().create(body=parent_metadata, fields='id').execute()
-                parent_folder_id = parent_folder.get('id')
-                self.add_log("✅ Created parent folder", 'success')
-            
-            # Create resumes folder
-            resume_query = f"name='Resumes by Domain' and parents in '{parent_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-            resume_results = self.drive_service.files().list(q=resume_query, fields="files(id, name)").execute()
-            
-            if resume_results.get('files'):
-                self.resume_folder_id = resume_results['files'][0]['id']
-                self.add_log("✅ Found existing Resumes folder", 'success')
-            else:
-                resume_metadata = {
-                    'name': 'Resumes by Domain',
-                    'parents': [parent_folder_id],
-                    'mimeType': 'application/vnd.google-apps.folder'
-                }
-                resume_folder = self.drive_service.files().create(body=resume_metadata, fields='id').execute()
-                self.resume_folder_id = resume_folder.get('id')
-                self.add_log("✅ Created Resumes folder", 'success')
-            
-            # Create domain folders
-            domains = ['Physical Design', 'Design Verification', 'DFT', 'RTL Design', 'Analog Design', 'FPGA', 'Silicon Validation', 'Mixed Signal', 'General VLSI', 'Unknown Domain']
-            
-            for domain in domains:
-                folder_query = f"name='{domain}' and parents in '{self.resume_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-                folder_results = self.drive_service.files().list(q=folder_query, fields="files(id, name)").execute()
-                
-                if folder_results.get('files'):
-                    self.domain_folders[domain] = folder_results['files'][0]['id']
-                    self.add_log(f"✅ Found folder: {domain}", 'success')
-                else:
-                    folder_metadata = {
-                        'name': domain,
-                        'parents': [self.resume_folder_id],
-                        'mimeType': 'application/vnd.google-apps.folder'
-                    }
-                    folder = self.drive_service.files().create(body=folder_metadata, fields='id').execute()
-                    self.domain_folders[domain] = folder.get('id')
-                    self.add_log(f"✅ Created folder: {domain}", 'success')
-                    
-                    # Create experience subfolders
-                    for exp_level in ['Fresher (0-2 years)', 'Mid-Level (2-5 years)', 'Senior (5-8 years)', 'Experienced (8+ years)']:
-                        exp_metadata = {
-                            'name': exp_level,
-                            'parents': [folder.get('id')],
-                            'mimeType': 'application/vnd.google-apps.folder'
-                        }
-                        self.drive_service.files().create(body=exp_metadata, fields='id').execute()
-            
-            return True
-            
-        except Exception as e:
-            self.add_log(f"❌ Drive setup failed: {e}", 'error')
-            return False
-
-    def scan_emails(self, max_results: int = None) -> Dict[str, Any]:
-        """Scan Gmail for resume attachments"""
-        try:
-            if not self.gmail_service:
-                return {'success': False, 'error': 'Gmail service not available'}
-            
-            self.add_log(f"🔍 Starting Gmail scan", 'info')
-            
-            # Search for emails with attachments
-            query = 'has:attachment (filename:pdf OR filename:doc OR filename:docx)'
-            if max_results:
-                query += f' newer_than:30d'
-            
-            result = self.gmail_service.users().messages().list(
-                userId='me',
-                q=query,
-                maxResults=min(50, max_results or 50)
-            ).execute()
-            
-            messages = result.get('messages', [])
-            self.add_log(f"📧 Found {len(messages)} emails with attachments", 'info')
-            
-            resumes_found = 0
-            processed_count = 0
-            
-            for i, message in enumerate(messages, 1):
-                try:
-                    self.add_log(f"📨 Processing email {i}/{len(messages)}", 'info')
-                    result = self.process_email(message['id'])
-                    
-                    if result.get('has_resume'):
-                        resumes_found += 1
-                        
-                    processed_count += 1
-                    
-                    if i % 5 == 0:
-                        time.sleep(1)  # Rate limiting
-                        
-                except Exception as e:
-                    self.add_log(f"❌ Error processing email {i}: {e}", 'error')
-                    continue
-            
-            # Update stats
-            self.stats['total_emails'] = processed_count
-            self.stats['resumes_found'] = resumes_found
-            self.stats['last_scan_time'] = datetime.now().isoformat()
-            
-            self.add_log(f"✅ Scan completed: {processed_count} emails, {resumes_found} resumes", 'success')
-            
-            return {
-                'success': True,
-                'processed': processed_count,
-                'resumes_found': resumes_found,
-                'stats': self.stats
-            }
-            
-        except Exception as e:
-            self.add_log(f"❌ Email scan failed: {e}", 'error')
-            return {'success': False, 'error': str(e)}
-
-    def process_email(self, message_id: str) -> Dict[str, Any]:
-        """Process a single email for resume attachments"""
-        try:
-            message = self.gmail_service.users().messages().get(userId='me', id=message_id).execute()
-            
-            headers = message['payload'].get('headers', [])
-            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
-            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
-            date_header = next((h['value'] for h in headers if h['name'] == 'Date'), '')
-            
-            # Check for attachments
-            attachments = []
-            if 'parts' in message['payload']:
-                for part in message['payload']['parts']:
-                    filename = part.get('filename', '').lower()
-                    if filename and (filename.endswith('.pdf') or filename.endswith('.doc') or filename.endswith('.docx')):
-                        if 'body' in part and 'attachmentId' in part['body']:
-                            attachments.append({
-                                'filename': part['filename'],
-                                'attachment_id': part['body']['attachmentId'],
-                                'size': part['body'].get('size', 0),
-                                'type': 'pdf' if filename.endswith('.pdf') else 'doc'
-                            })
-            
-            has_resume = False
-            processed_attachments = []
-            
-            for attachment in attachments:
-                try:
-                    # Download attachment
-                    att = self.gmail_service.users().messages().attachments().get(
-                        userId='me',
-                        messageId=message_id,
-                        id=attachment['attachment_id']
-                    ).execute()
-                    
-                    data = base64.urlsafe_b64decode(att['data'])
-                    
-                    # Analyze content
-                    analysis_result = self.analyze_content(data, attachment['filename'])
-                    
-                    if analysis_result and analysis_result.get('is_resume', False):
-                        has_resume = True
-                        
-                        # Save to Drive
-                        drive_file_id = self.save_to_drive(
-                            data,
-                            attachment['filename'],
-                            {
-                                'subject': subject,
-                                'sender': sender,
-                                'date': date_header,
-                                'analysis_result': analysis_result
-                            }
-                        )
-                        
-                        processed_attachments.append({
-                            'filename': attachment['filename'],
-                            'domain': analysis_result.get('domain', 'Unknown Domain'),
-                            'experience': analysis_result.get('experience_level', 'Unknown'),
-                            'score': analysis_result.get('resume_score', 0),
-                            'drive_file_id': drive_file_id
-                        })
-                        
-                        self.add_log(f"✅ Resume: {attachment['filename']} | {analysis_result.get('domain', 'Unknown')} | {analysis_result.get('experience_level', 'Unknown')}", 'success')
-                    
-                except Exception as e:
-                    self.add_log(f"❌ Error processing {attachment['filename']}: {e}", 'error')
-                    continue
-            
-            return {
-                'message_id': message_id,
-                'subject': subject,
-                'sender': sender,
-                'date': date_header,
-                'has_resume': has_resume,
-                'attachments': processed_attachments
-            }
-            
-        except Exception as e:
-            self.add_log(f"❌ Error processing email {message_id}: {e}", 'error')
-            return {'message_id': message_id, 'error': str(e)}
-
-    def analyze_content(self, file_data: bytes, filename: str) -> Dict[str, Any]:
-        """Analyze file content to determine if it's a resume and categorize it"""
-        try:
-            text = ""
-            
-            # Extract text based on file type
-            if filename.lower().endswith('.pdf'):
-                text = self.extract_pdf_text(file_data)
-            elif filename.lower().endswith('.docx'):
-                text = self.extract_docx_text(file_data, filename)
-            elif filename.lower().endswith('.doc'):
-                text = self.extract_doc_text(file_data, filename)
-            
-            if not text:
-                return {'is_resume': False, 'domain': 'Unknown Domain', 'experience_level': 'Unknown', 'resume_score': 0}
-            
-            # Analyze text for resume indicators
-            text_lower = text.lower()
-            
-            # Basic resume detection
-            resume_indicators = ['experience', 'education', 'skills', 'resume', 'cv', 'work', 'employment', 'career']
-            resume_score = sum(1 for indicator in resume_indicators if indicator in text_lower)
-            
-            if resume_score < 3:
-                return {'is_resume': False, 'domain': 'Unknown Domain', 'experience_level': 'Unknown', 'resume_score': 0}
-            
-            # Domain classification
-            domain_keywords = {
-                'Physical Design': ['physical design', 'place and route', 'floorplanning', 'sta', 'primetime', 'innovus', 'icc'],
-                'Design Verification': ['verification', 'uvm', 'systemverilog', 'testbench', 'coverage', 'questa', 'vcs'],
-                'DFT': ['dft', 'scan', 'atpg', 'bist', 'test', 'tessent'],
-                'RTL Design': ['rtl', 'verilog', 'synthesis', 'design compiler'],
-                'Analog Design': ['analog', 'adc', 'dac', 'pll', 'opamp', 'spice'],
-                'FPGA': ['fpga', 'xilinx', 'vivado', 'quartus'],
-                'Silicon Validation': ['validation', 'silicon', 'post silicon', 'bring up'],
-                'Mixed Signal': ['mixed signal', 'serdes', 'high speed']
-            }
-            
-            domain_scores = {}
-            for domain, keywords in domain_keywords.items():
-                score = sum(1 for keyword in keywords if keyword in text_lower)
-                domain_scores[domain] = score
-            
-            # Determine primary domain
-            if domain_scores:
-                primary_domain = max(domain_scores.items(), key=lambda x: x[1])
-                domain = primary_domain[0] if primary_domain[1] > 0 else 'General VLSI'
-            else:
-                domain = 'Unknown Domain'
-            
-            # Experience level detection
-            experience_years = 0
-            year_patterns = [r'(\d+)\s*years?\s*(?:of\s*)?(?:experience|exp)', r'(\d+)\+?\s*yrs?']
-            
-            for pattern in year_patterns:
-                matches = re.findall(pattern, text_lower)
-                for match in matches:
-                    years = int(match)
-                    if years > experience_years:
-                        experience_years = years
-            
-            # Categorize experience
-            if experience_years <= 2:
-                experience_level = 'Fresher (0-2 years)'
-            elif experience_years <= 5:
-                experience_level = 'Mid-Level (2-5 years)'
-            elif experience_years <= 8:
-                experience_level = 'Senior (5-8 years)'
-            else:
-                experience_level = 'Experienced (8+ years)'
-            
-            return {
-                'is_resume': True,
-                'domain': domain,
-                'experience_level': experience_level,
-                'experience_years': experience_years,
-                'resume_score': min(resume_score / 10.0, 1.0)
-            }
-            
-        except Exception as e:
-            self.add_log(f"❌ Error analyzing {filename}: {e}", 'error')
-            return {'is_resume': False, 'domain': 'Unknown Domain', 'experience_level': 'Unknown', 'resume_score': 0}
-
-    def extract_pdf_text(self, pdf_data: bytes) -> str:
-        """Extract text from PDF"""
-        try:
-            if not PDF_PROCESSING_AVAILABLE:
-                return ""
-            
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
-                temp_file.write(pdf_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                import pdfplumber
-                with pdfplumber.open(temp_file_path) as pdf:
-                    text = ""
-                    for page in pdf.pages:
-                        page_text = page.extract_text()
-                        if page_text:
-                            text += page_text + "\n"
-                return text
-            except ImportError:
-                import PyPDF2
-                with open(temp_file_path, 'rb') as file:
-                    pdf_reader = PyPDF2.PdfReader(file)
-                    text = ""
-                    for page in pdf_reader.pages:
-                        text += page.extract_text() + "\n"
-                return text
-            finally:
-                os.unlink(temp_file_path)
-                
-        except Exception as e:
-            self.add_log(f"❌ PDF extraction failed: {e}", 'error')
-            return ""
-
-    def extract_docx_text(self, doc_data: bytes, filename: str) -> str:
-        """Extract text from DOCX"""
-        try:
-            if not DOCX_PROCESSING_AVAILABLE:
-                return ""
-            
-            with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as temp_file:
-                temp_file.write(doc_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                doc = Document(temp_file_path)
-                text = ""
-                for paragraph in doc.paragraphs:
-                    text += paragraph.text + "\n"
-                return text
-            finally:
-                os.unlink(temp_file_path)
-                
-        except Exception as e:
-            self.add_log(f"❌ DOCX extraction failed: {e}", 'error')
-            return ""
-
-    def extract_doc_text(self, doc_data: bytes, filename: str) -> str:
-        """Extract text from DOC"""
-        try:
-            if not DOC_PROCESSING_AVAILABLE:
-                return ""
-            
-            with tempfile.NamedTemporaryFile(suffix='.doc', delete=False) as temp_file:
-                temp_file.write(doc_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                import docx2txt
-                text = docx2txt.process(temp_file_path)
-                return text
-            finally:
-                os.unlink(temp_file_path)
-                
-        except Exception as e:
-            self.add_log(f"❌ DOC extraction failed: {e}", 'error')
-            return ""
-
-    def save_to_drive(self, file_data: bytes, filename: str, metadata: Dict) -> Optional[str]:
-        """Save file to Google Drive with domain and experience organization"""
-        try:
-            if not self.drive_service:
-                return None
-            
-            analysis = metadata.get('analysis_result', {})
-            domain = analysis.get('domain', 'Unknown Domain')
-            experience_level = analysis.get('experience_level', 'Unknown')
-            experience_years = analysis.get('experience_years', 0)
-            
-            # Get domain folder
-            domain_folder_id = self.domain_folders.get(domain, self.domain_folders.get('Unknown Domain'))
-            
-            # Find experience subfolder
-            exp_folder_query = f"name='{experience_level}' and parents in '{domain_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-            exp_results = self.drive_service.files().list(q=exp_folder_query, fields="files(id, name)").execute()
-            
-            if exp_results.get('files'):
-                target_folder_id = exp_results['files'][0]['id']
-            else:
-                # Create experience subfolder
-                exp_metadata = {
-                    'name': experience_level,
-                    'parents': [domain_folder_id],
-                    'mimeType': 'application/vnd.google-apps.folder'
-                }
-                exp_folder = self.drive_service.files().create(body=exp_metadata, fields='id').execute()
-                target_folder_id = exp_folder.get('id')
-            
-            # Create enhanced filename
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            file_extension = filename.split('.')[-1].lower()
-            clean_filename = filename.replace(f'.{file_extension}', '')
-            
-            domain_abbrev = {
-                'Physical Design': 'PD', 'Design Verification': 'DV', 'DFT': 'DFT',
-                'RTL Design': 'RTL', 'Analog Design': 'ANA', 'FPGA': 'FPGA',
-                'Silicon Validation': 'SiVal', 'Mixed Signal': 'MS',
-                'General VLSI': 'VLSI', 'Unknown Domain': 'UNK'
-            }.get(domain, 'UNK')
-            
-            exp_abbrev = {
-                'Fresher (0-2 years)': 'FR', 'Mid-Level (2-5 years)': 'ML',
-                'Senior (5-8 years)': 'SR', 'Experienced (8+ years)': 'EX'
-            }.get(experience_level, 'UK')
-            
-            new_filename = f"[{domain_abbrev}_{exp_abbrev}_{experience_years}Y] {timestamp}_{clean_filename}.{file_extension}"
-            
-            file_metadata = {
-                'name': new_filename,
-                'parents': [target_folder_id],
-                'description': f"""VLSI Resume Scanner Analysis
-
-Email: {metadata.get('sender', 'Unknown')}
-Subject: {metadata.get('subject', 'No subject')}
-Date: {metadata.get('date', 'Unknown')}
-
-Domain: {domain}
-Experience: {experience_level} ({experience_years} years)
-Score: {analysis.get('resume_score', 0):.2f}
-
-Auto-filed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-Location: {domain} > {experience_level}"""
-            }
-            
-            # Upload file
-            mime_types = {
-                'pdf': 'application/pdf',
-                'doc': 'application/msword',
-                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            }
-            mime_type = mime_types.get(file_extension, 'application/octet-stream')
-            
-            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
-                temp_file.write(file_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                from googleapiclient.http import MediaFileUpload
-                media = MediaFileUpload(temp_file_path, mimetype=mime_type)
-                file = self.drive_service.files().create(
-                    body=file_metadata,
-                    media_body=media,
-                    fields='id'
-                ).execute()
-                
-                file_id = file.get('id')
-                self.add_log(f"💾 Saved: {domain}/{experience_level} - {filename}", 'success')
-                return file_id
-                
-            finally:
-                os.unlink(temp_file_path)
-            
-        except Exception as e:
-            self.add_log(f"❌ Save failed for {filename}: {e}", 'error')
-            return None
-
-    def get_system_status(self) -> Dict[str, Any]:
-        """Get current system status"""
-        return {
-            'google_apis_available': GOOGLE_APIS_AVAILABLE,
-            'pdf_processing_available': PDF_PROCESSING_AVAILABLE,
-            '
+    app.run(host='0.0.0.0', port=port, debug=False)
