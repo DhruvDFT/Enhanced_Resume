@@ -16,3 +16,5 @@ python-docx==0.8.11
 # Additional utilities (optional but recommended)
 requests==2.31.0
 python-dateutil==2.8.2
+
+docx2txt
