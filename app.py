@@ -1,1944 +1,1409 @@
+# Keywords for auto-scoring (updated for all 60 questions)
+ANSWER_KEYWORDS = {
+    "floorplanning": {
+        # Set 1 keywords (questions 0-14)
+        0: ["macro placement", "timing", "power", "utilization", "power delivery", "IR drop", "blockage", "pins", "orientation", "dataflow"],
+        1: ["setup violations", "timing paths", "floorplan", "critical paths", "placement", "buffers", "repeaters", "pipeline", "hierarchy", "partition"],
+        2: ["congestion", "routing", "density", "spreading", "blockages", "channels", "utilization", "cell density", "padding", "keep-out"],
+        3: ["voltage domains", "level shifter", "power grid", "isolation", "domain crossing", "power planning", "multi-voltage", "always-on", "shutdown", "interface"],
+        4: ["clock domains", "clock tree", "skew", "latency", "synchronization", "CDC", "metastability", "clock gating", "mesh", "H-tree"],
+        5: ["memory placement", "access time", "pin alignment", "data flow", "power straps", "decap", "timing critical", "bus routing", "periphery", "clustering"],
+        6: ["IR drop", "power grid", "mesh density", "via pillars", "current density", "electromigration", "power straps", "decap cells", "voltage", "resistance"],
+        7: ["die area", "utilization", "aspect ratio", "channel width", "macro spacing", "standard cell", "optimization", "timing margin", "risk", "iterations"],
+        8: ["mixed-signal", "noise isolation", "guard rings", "substrate", "digital noise", "analog", "shielding", "separate supplies", "deep n-well", "distance"],
+        9: ["congestion map", "global route", "heat map", "trial route", "density screens", "fly lines", "pin density", "track utilization", "gcell", "overflow"],
+        10: ["hierarchical", "partition", "interface logic", "feedthrough", "pin assignment", "budgeting", "black box", "timing model", "boundary", "repeaters"],
+        11: ["scan chains", "DFT", "test mode", "scan flops", "compression", "test time", "wire length", "shift power", "launch capture", "scan routing"],
+        12: ["power gating", "retention", "isolation cells", "power switches", "sleep mode", "MTCMOS", "header footer", "rush current", "wake-up", "domains"],
+        13: ["ECO", "spare cells", "flexibility", "metal layers", "gate array", "filler cells", "keep-out", "reserve", "incremental", "freeze"],
+        14: ["validation", "quality checks", "congestion", "timing", "utilization", "connectivity", "DRC", "pin access", "aspect ratio", "metrics"],
+        # Set 2 keywords (questions 15-29)
+        15: ["voltage domains", "power sequencing", "domain crossing", "level shifters", "isolation", "retention", "always-on", "power-up", "interface", "complexity"],
+        16: ["mesh clock", "distribution", "skew", "jitter", "drivers", "leaf cells", "grid", "redundancy", "short circuit", "analysis"],
+        17: ["datapath", "multipliers", "ALU", "pipeline", "bit-slice", "regularity", "bus routing", "critical path", "placement", "hierarchy"],
+        18: ["analog digital", "substrate", "noise coupling", "guard rings", "isolation", "separate supplies", "shielding", "distance", "deep n-well", "seal ring"],
+        19: ["power grid", "IR drop", "current density", "mesh", "straps", "via arrays", "decap", "analysis", "electromigration", "optimization"],
+        20: ["hard IP", "macro placement", "puzzle", "utilization", "channels", "aspect ratio", "orientation", "pins", "blockages", "dataflow"],
+        21: ["DVFS", "voltage scaling", "frequency", "domains", "level shifters", "headers", "retention", "transition", "power states", "floorplan"],
+        22: ["SerDes", "high-speed", "differential", "termination", "power noise", "isolation", "bumps", "escape routing", "shielding", "placement rules"],
+        23: ["thermal", "hotspots", "heat dissipation", "power density", "spreading", "package", "thermal vias", "gradient", "placement", "monitors"],
+        24: ["variants", "high-performance", "low-power", "common floorplan", "flexibility", "constraints", "trade-offs", "parameterized", "derivatives", "reuse"],
+        25: ["security", "hardware", "isolation", "shielding", "tamper", "side-channel", "physical attacks", "sensors", "mesh", "boundaries"],
+        26: ["test modes", "BIST", "scan", "access", "TAP", "compression", "controllers", "routing", "multiplexing", "coverage"],
+        27: ["chiplet", "die-to-die", "interface", "micro-bumps", "alignment", "pitch", "PHY placement", "signal integrity", "power delivery", "yield"],
+        28: ["repeater", "buffer", "planning", "stages", "delay", "slew", "placement", "resources", "prediction", "optimization"],
+        29: ["aspect ratio", "pin placement", "package", "constraints", "IO planning", "bump map", "escape", "redistribution", "signal groups", "power"],
+        # Set 3 keywords (questions 30-44)
+        30: ["multi-core", "cache", "latency", "coherency", "mesh", "ring", "placement", "distance", "bandwidth", "arbitration"],
+        31: ["reconfiguration", "partial", "regions", "boundaries", "static logic", "isolation", "clocking", "routing", "constraints", "bitstream"],
+        32: ["hard macro", "timing models", "uncertainty", "margins", "interface", "budgeting", "constraints", "abstraction", "black box", "validation"],
+        33: ["HBM", "memory interface", "PHY", "channels", "bump planning", "signal integrity", "power",# app.py - Physical Design Interview System (3 Questions Version)
 import os
 import json
-import logging
-import re
-import base64
-import time
-import tempfile
-from datetime import datetime
-from typing import Dict, Any, Optional, List, Tuple
-from collections import Counter
-from flask import Flask, render_template_string, request, jsonify, session
-
-# Try to import Google API libraries
-try:
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    from googleapiclient.discovery import build
-    GOOGLE_APIS_AVAILABLE = True
-except ImportError:
-    GOOGLE_APIS_AVAILABLE = False
-
-# Try to import PDF processing
-try:
-    import PyPDF2
-    PDF_PROCESSING_AVAILABLE = True
-except ImportError:
-    try:
-        import pdfplumber
-        PDF_PROCESSING_AVAILABLE = True
-    except ImportError:
-        PDF_PROCESSING_AVAILABLE = False
-
-# Try to import DOC processing
-try:
-    from docx import Document
-    DOCX_PROCESSING_AVAILABLE = True
-except ImportError:
-    DOCX_PROCESSING_AVAILABLE = False
-
-try:
-    import docx2txt
-    DOC_PROCESSING_AVAILABLE = True
-except ImportError:
-    DOC_PROCESSING_AVAILABLE = False
+from datetime import datetime, timedelta
+from flask import Flask, request, jsonify, redirect, session, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'vlsi-scanner-secret-key-2024')
+app.secret_key = os.environ.get('SECRET_KEY', 'pd-secret-2024')
 
-# Configuration
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
-SCOPES = [
-    'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/drive.file'
-]
+# In-memory storage
+users = {}
+assignments = {}
+notifications = {}
+assignment_counter = 0
 
-logging.basicConfig(level=logging.INFO)
-
-
-class EnhancedResumeAnalyzer:
-    """Enhanced resume analysis with better classification and filtering"""
+# Initialize default users
+def init_users():
+    # Admin with new password
+    users['admin'] = {
+        'id': 'admin',
+        'username': 'admin',
+        'password': generate_password_hash('Vibhuaya@3006'),
+        'is_admin': True,
+        'experience_years': 3
+    }
     
-    def __init__(self):
-        # Enhanced domain keywords with weights and context
-        self.domain_keywords = {
-            'Physical Design': {
-                'primary': {
-                    'physical design': 3, 'pd engineer': 3, 'place and route': 3, 
-                    'floorplanning': 3, 'clock tree synthesis': 3, 'cts': 2,
-                    'sta': 2, 'static timing analysis': 3, 'primetime': 2,
-                    'innovus': 2, 'icc': 2, 'icc2': 2, 'encounter': 2,
-                    'power planning': 2, 'ir drop': 2, 'em analysis': 2,
-                    'drc': 2, 'lvs': 2, 'timing closure': 3, 'eco': 2,
-                    'synopsys': 1, 'cadence': 1, 'mentor': 1
-                },
-                'secondary': {
-                    'layout': 1, 'gds': 1, 'def': 1, 'lef': 1, 'spef': 1,
-                    'sdc': 1, 'upf': 1, 'cpf': 1, 'low power': 1
-                },
-                'negative': ['verification engineer', 'dv engineer', 'validation engineer']
-            },
-            'Design Verification': {
-                'primary': {
-                    'verification': 3, 'dv engineer': 3, 'design verification': 3,
-                    'uvm': 3, 'systemverilog': 3, 'testbench': 3, 'coverage': 2,
-                    'functional coverage': 3, 'code coverage': 2, 'assertion': 2,
-                    'scoreboard': 2, 'monitor': 2, 'driver': 2, 'sequence': 2,
-                    'questa': 2, 'vcs': 2, 'ncsim': 2, 'xcelium': 2,
-                    'formal verification': 2, 'simulation': 2, 'regression': 2
-                },
-                'secondary': {
-                    'ovm': 1, 'vmm': 1, 'constrained random': 2, 'directed test': 1,
-                    'protocol': 1, 'checker': 1, 'bfm': 1, 'vip': 1
-                },
-                'negative': ['physical design', 'pd engineer', 'silicon validation']
-            },
-            'DFT': {
-                'primary': {
-                    'dft': 3, 'design for test': 3, 'scan': 3, 'atpg': 3,
-                    'bist': 3, 'mbist': 3, 'lbist': 3, 'boundary scan': 2,
-                    'jtag': 2, 'test pattern': 2, 'fault coverage': 3,
-                    'tessent': 2, 'tetramax': 2, 'fastscan': 2,
-                    'scan chain': 3, 'scan compression': 2, 'test mode': 2
-                },
-                'secondary': {
-                    'stuck at': 1, 'transition fault': 1, 'path delay': 1,
-                    'iddq': 1, 'burn in': 1, 'yield': 1, 'diagnosis': 1
-                },
-                'negative': ['software test', 'qa engineer', 'test automation']
-            },
-            'RTL Design': {
-                'primary': {
-                    'rtl': 3, 'rtl design': 3, 'verilog': 3, 'vhdl': 2,
-                    'synthesis': 3, 'design compiler': 2, 'genus': 2,
-                    'microarchitecture': 3, 'fsm': 2, 'state machine': 2,
-                    'pipeline': 2, 'datapath': 2, 'control logic': 2,
-                    'lint': 1, 'cdc': 2, 'clock domain crossing': 2
-                },
-                'secondary': {
-                    'hdl': 1, 'behavioral': 1, 'structural': 1, 'gate level': 1,
-                    'netlist': 1, 'elaboration': 1, 'inference': 1
-                },
-                'negative': ['verification', 'physical design', 'analog']
-            },
-            'Analog Design': {
-                'primary': {
-                    'analog': 3, 'analog design': 3, 'mixed signal': 2,
-                    'adc': 3, 'dac': 3, 'pll': 3, 'dll': 2, 'vco': 2,
-                    'opamp': 3, 'amplifier': 2, 'comparator': 2,
-                    'bandgap': 2, 'ldo': 2, 'dcdc': 2, 'power management': 2,
-                    'spice': 3, 'spectre': 3, 'hspice': 2, 'cadence virtuoso': 3,
-                    'layout': 2, 'matching': 2, 'noise': 2
-                },
-                'secondary': {
-                    'cmos': 1, 'bjt': 1, 'mosfet': 1, 'transistor': 1,
-                    'current mirror': 1, 'bias': 1, 'stability': 1,
-                    'phase margin': 1, 'gain': 1, 'bandwidth': 1
-                },
-                'negative': ['digital design', 'rtl', 'fpga']
-            },
-            'FPGA': {
-                'primary': {
-                    'fpga': 3, 'xilinx': 3, 'altera': 2, 'intel fpga': 2,
-                    'vivado': 3, 'quartus': 3, 'ise': 2, 'vitis': 2,
-                    'zynq': 2, 'ultrascale': 2, 'stratix': 2, 'arria': 2,
-                    'hls': 2, 'high level synthesis': 2, 'partial reconfiguration': 2
-                },
-                'secondary': {
-                    'xdc': 1, 'qsf': 1, 'bitstream': 1, 'block ram': 1,
-                    'dsp slice': 1, 'clb': 1, 'lut': 1, 'fabric': 1
-                },
-                'negative': ['asic', 'custom silicon', 'tapeout']
-            },
-            'Silicon Validation': {
-                'primary': {
-                    'silicon validation': 3, 'post silicon': 3, 'bring up': 3,
-                    'debug': 2, 'characterization': 3, 'correlation': 2,
-                    'lab': 2, 'oscilloscope': 2, 'logic analyzer': 2,
-                    'pattern generator': 2, 'probe': 2, 'eva': 2,
-                    'yield analysis': 2, 'failure analysis': 2
-                },
-                'secondary': {
-                    'ate': 1, 'tester': 1, 'loadboard': 1, 'socket': 1,
-                    'thermal': 1, 'voltage': 1, 'frequency': 1, 'shmoo': 1
-                },
-                'negative': ['pre silicon', 'rtl', 'design verification']
-            },
-            'Mixed Signal': {
-                'primary': {
-                    'mixed signal': 3, 'ams': 3, 'analog mixed signal': 3,
-                    'serdes': 3, 'high speed': 2, 'transceiver': 2,
-                    'pcie': 2, 'usb': 2, 'ddr': 2, 'mipi': 2,
-                    'signal integrity': 2, 'jitter': 2, 'eye diagram': 2,
-                    'equalization': 2, 'cdr': 2, 'ctle': 2, 'dfe': 2
-                },
-                'secondary': {
-                    'differential': 1, 'termination': 1, 'impedance': 1,
-                    'crosstalk': 1, 'insertion loss': 1, 'return loss': 1
-                },
-                'negative': ['pure analog', 'pure digital']
-            }
-        }
-        
-        # Resume structure indicators
-        self.resume_sections = {
-            'contact': ['email', 'phone', 'address', 'linkedin', 'github'],
-            'summary': ['summary', 'objective', 'profile', 'about'],
-            'experience': ['experience', 'employment', 'work history', 'professional experience'],
-            'education': ['education', 'qualification', 'degree', 'university', 'college'],
-            'skills': ['skills', 'technical skills', 'core competencies', 'expertise'],
-            'projects': ['projects', 'key projects', 'academic projects'],
-            'achievements': ['achievements', 'accomplishments', 'awards', 'recognition']
-        }
-        
-        # Non-resume document indicators
-        self.non_resume_indicators = [
-            'table of contents', 'chapter', 'bibliography', 'references',
-            'abstract', 'introduction', 'conclusion', 'methodology',
-            'invoice', 'receipt', 'balance sheet', 'financial statement',
-            'confidential', 'proprietary', 'not for distribution',
-            'user manual', 'datasheet', 'specification', 'rev ', 'version '
-        ]
-
-    def is_resume(self, text: str) -> Dict[str, Any]:
-        """Determine if document is actually a resume"""
-        text_lower = text.lower()
-        
-        # Check for non-resume indicators
-        non_resume_count = sum(1 for indicator in self.non_resume_indicators 
-                              if indicator in text_lower)
-        if non_resume_count >= 3:
-            return {
-                'is_resume': False,
-                'confidence': 0.9,
-                'reason': 'Document appears to be technical documentation or report'
-            }
-        
-        # Count resume sections
-        section_counts = {}
-        total_sections = 0
-        for section, keywords in self.resume_sections.items():
-            count = sum(1 for keyword in keywords if keyword in text_lower)
-            if count > 0:
-                section_counts[section] = count
-                total_sections += 1
-        
-        # Must have at least 3 resume sections
-        if total_sections < 3:
-            return {
-                'is_resume': False,
-                'confidence': 0.7,
-                'reason': f'Only {total_sections} resume sections found'
-            }
-        
-        # Check for personal pronouns (resumes often use "I" or are written in third person)
-        first_person = len(re.findall(r'\bi\b', text_lower))
-        has_personal_content = first_person > 2 or 'experience' in text_lower
-        
-        # Calculate confidence
-        confidence = min(0.95, 0.3 + (total_sections * 0.15) + (0.1 if has_personal_content else 0))
-        
-        return {
-            'is_resume': True,
-            'confidence': confidence,
-            'sections_found': list(section_counts.keys())
+    # 5 Students
+    for i in range(1, 6):  # Changed to 6 for 5 engineers
+        user_id = f'eng00{i}'
+        users[user_id] = {
+            'id': user_id,
+            'username': user_id,
+            'password': generate_password_hash('password123'),
+            'is_admin': False,
+            'experience_years': 3
         }
 
-    def analyze_domains(self, text: str) -> Dict[str, Any]:
-        """Enhanced domain analysis with context awareness"""
-        text_lower = text.lower()
-        domain_scores = {}
-        
-        for domain, keywords_dict in self.domain_keywords.items():
-            score = 0
-            matches = []
-            
-            # Check primary keywords
-            for keyword, weight in keywords_dict['primary'].items():
-                count = len(re.findall(r'\b' + re.escape(keyword) + r'\b', text_lower))
-                if count > 0:
-                    score += count * weight
-                    matches.append(keyword)
-            
-            # Check secondary keywords
-            for keyword, weight in keywords_dict['secondary'].items():
-                count = len(re.findall(r'\b' + re.escape(keyword) + r'\b', text_lower))
-                if count > 0:
-                    score += count * weight
-                    matches.append(keyword)
-            
-            # Apply negative keywords penalty
-            for neg_keyword in keywords_dict.get('negative', []):
-                if neg_keyword in text_lower:
-                    score *= 0.7  # Reduce score by 30%
-            
-            domain_scores[domain] = {
-                'score': score,
-                'matches': matches,
-                'match_count': len(matches)
-            }
-        
-        # Sort domains by score
-        sorted_domains = sorted(domain_scores.items(), 
-                               key=lambda x: x[1]['score'], 
-                               reverse=True)
-        
-        # Determine primary domain
-        if sorted_domains[0][1]['score'] > 0:
-            primary_domain = sorted_domains[0][0]
-            confidence = min(0.95, sorted_domains[0][1]['score'] / 100)
-            
-            # Check if it's a mixed profile
-            if len(sorted_domains) > 1 and sorted_domains[1][1]['score'] > 0:
-                second_score_ratio = sorted_domains[1][1]['score'] / sorted_domains[0][1]['score']
-                if second_score_ratio > 0.7:  # Secondary domain is strong too
-                    primary_domain = 'Mixed Signal'  # or could be multi-domain
-        else:
-            primary_domain = 'General VLSI'
-            confidence = 0.3
-        
-        return {
-            'primary_domain': primary_domain,
-            'confidence': confidence,
-            'all_domains': [
-                {
-                    'domain': domain,
-                    'score': info['score'],
-                    'matches': info['matches'][:5]  # Top 5 matches
-                }
-                for domain, info in sorted_domains[:3]
-                if info['score'] > 0
-            ]
-        }
+# 4 Sets of Questions per topic (3+ Years Experience) - 15 questions each
+# Set 1
+QUESTIONS_SET1 = {
+    "floorplanning": [
+        "You have a 5mm x 5mm die with 4 hard macros (each 1mm x 0.8mm) and need to achieve 70% utilization. Describe your macro placement strategy considering timing and power delivery.",
+        "Your design has setup timing violations on paths crossing from left to right. The floorplan has macros placed randomly. How would you reorganize the floorplan to improve timing?",
+        "During floorplan, you notice routing congestion in the center region. What are 3 specific techniques you would use to reduce congestion without major timing impact?",
+        "You're working with a design that has 2 voltage domains (0.9V core, 1.2V IO). Explain how you would plan the floorplan to minimize level shifter count and power grid complexity.",
+        "Your design has 3 clock domains running at 800MHz, 400MHz, and 100MHz. How would you approach floorplanning to minimize clock tree power and skew?",
+        "You need to place 8 memory instances in your design. What factors would you consider for their placement, and how would you verify the floorplan quality?",
+        "Your floorplan review shows IR drop violations in certain regions. Describe your approach to fix this through floorplan changes and power grid improvements.",
+        "You're told to reduce die area by 10% while maintaining timing. What floorplan modifications would you make and what risks would you monitor?",
+        "Your design has mixed-signal blocks that need isolation from digital switching noise. How would you handle their placement and what guard techniques would you use?",
+        "During early floorplan, how would you estimate routing congestion and what tools/techniques help predict routability issues?",
+        "You have a hierarchical design with 3 major blocks. Explain your approach to partition-level floorplanning and interface planning between blocks.",
+        "Your design requires scan chains for testing. How does DFT impact your floorplan decisions and what considerations are important for scan routing?",
+        "You're working on a power-sensitive design. Describe floorplan techniques to enable effective power gating and retention strategies.",
+        "Your floorplan needs to accommodate late ECOs (Engineering Change Orders). How would you plan for flexibility and what areas would you keep available?",
+        "Explain your methodology for floorplan validation - what checks would you run and what metrics indicate a good floorplan ready for placement?"
+    ],
+    "placement": [
+        "Your placement run shows timing violations on 20 critical paths with negative slack up to -50ps. Describe your systematic approach to fix these violations.",
+        "You're seeing routing congestion hotspots after placement in 2-3 regions. What placement adjustments would you make to improve routability?",
+        "Your design has high-fanout nets (>500 fanout) causing placement issues. How would you handle these nets during placement optimization?",
+        "Compare global placement vs detailed placement - what specific problems does each solve and when would you iterate between them?",
+        "Your placement shows leakage power higher than target. What placement techniques would you use to reduce power while maintaining timing?",
+        "You have a multi-voltage design with voltage islands. Describe your placement strategy for cells near domain boundaries and level shifter placement.",
+        "Your timing report shows hold violations scattered across the design. How would you address this through placement without affecting setup timing?",
+        "During placement, you notice that certain instances are creating long routes. What tools and techniques help identify and fix such placement issues?",
+        "Your design has clock gating cells. Explain their optimal placement strategy and impact on both power and timing.",
+        "You're working with a design that has both high-performance and low-power modes. How does this affect your placement strategy?",
+        "Your placement review shows uneven cell density distribution. Why is this problematic and how would you achieve better density distribution?",
+        "Describe your approach to placement optimization for designs with multiple timing corners (SS, FF, TT). How do you ensure all corners meet timing?",
+        "Your design has redundant logic for reliability. How would you place redundant instances to avoid common-mode failures?",
+        "You need to optimize placement for both area and timing. Describe the trade-offs and how you would balance these competing requirements.",
+        "Explain how placement impacts signal integrity. What placement techniques help minimize crosstalk and noise issues?"
+    ],
+    "routing": [
+        "After global routing, you have 500 DRC violations (spacing, via, width). Describe your systematic approach to resolve these violations efficiently.",
+        "Your design has 10 differential pairs for high-speed signals. Explain your routing strategy to maintain 100-ohm impedance and minimize skew.",
+        "You're seeing timing degradation after detailed routing compared to placement timing. What causes this and how would you recover the timing?",
+        "Your router is struggling with congestion in certain regions leading to routing non-completion. What techniques would you use to achieve 100% routing?",
+        "Describe your approach to power/ground routing. How do you ensure adequate current carrying capacity and low IR drop?",
+        "Your design has specific layer constraints (e.g., no routing on M1 except for local connections). How does this impact your routing strategy?",
+        "You have crosstalk violations on critical nets. Explain your routing techniques to minimize crosstalk and meet noise requirements.",
+        "Your clock nets require special routing with controlled skew. Describe clock routing methodology and skew optimization techniques.",
+        "During routing, some nets are showing electromigration violations. How would you address current density issues through routing changes?",
+        "You need to route in a design with double patterning constraints. Explain the challenges and your approach to handle decomposition issues.",
+        "Your design has antenna violations after routing. What causes these and what routing techniques help prevent antenna issues?",
+        "Describe your ECO (Engineering Change Order) routing strategy. How do you minimize disruption to existing clean routing?",
+        "Your timing closure requires specific net delays. How do you control routing parasitics to meet timing targets?",
+        "You're working with advanced technology nodes (7nm/5nm). What routing challenges are specific to these nodes and how do you address them?",
+        "Explain your routing verification methodology. What checks ensure your routing is manufacturable and reliable?"
+    ]
+}
 
-    def extract_experience(self, text: str) -> Dict[str, Any]:
-        """Extract experience with better pattern matching"""
-        text_lower = text.lower()
-        
-        # Multiple patterns for experience extraction
-        experience_patterns = [
-            r'(\d+\.?\d*)\s*\+?\s*(?:years?|yrs?)\s*(?:of\s*)?(?:experience|exp)',
-            r'experience\s*:?\s*(\d+\.?\d*)\s*\+?\s*(?:years?|yrs?)',
-            r'total\s*experience\s*:?\s*(\d+\.?\d*)\s*\+?\s*(?:years?|yrs?)',
-            r'(\d+\.?\d*)\s*(?:years?|yrs?)\s*(?:of\s*)?(?:professional|industry|relevant)',
-            r'working\s*since\s*(\d{4})',  # Calculate from year
-            r'(\d+)\s*years?\s*(\d+)\s*months?'  # Years and months
-        ]
-        
-        experience_years = 0
-        
-        for pattern in experience_patterns:
-            matches = re.findall(pattern, text_lower)
-            for match in matches:
-                if isinstance(match, tuple):
-                    if len(match) == 2:  # Years and months pattern
-                        years = float(match[0])
-                        months = float(match[1])
-                        total_years = years + (months / 12)
-                        if total_years > experience_years:
-                            experience_years = total_years
-                else:
-                    if pattern == r'working\s*since\s*(\d{4})':
-                        # Calculate years from start year
-                        start_year = int(match)
-                        current_year = datetime.now().year
-                        calculated_years = current_year - start_year
-                        if 0 < calculated_years < 50:  # Sanity check
-                            experience_years = max(experience_years, calculated_years)
-                    else:
-                        years = float(match)
-                        if years > experience_years and years < 50:  # Sanity check
-                            experience_years = years
-        
-        # Also check for fresher indicators
-        if experience_years == 0:
-            fresher_indicators = ['fresher', 'entry level', 'recent graduate', 
-                                'fresh graduate', 'seeking entry', '0 year']
-            if any(indicator in text_lower for indicator in fresher_indicators):
-                experience_years = 0
-        
-        # Categorize experience level
-        if experience_years <= 2:
-            level = 'Fresher (0-2 years)'
-        elif experience_years <= 5:
-            level = 'Mid-Level (2-5 years)'
-        elif experience_years <= 8:
-            level = 'Senior (5-8 years)'
-        else:
-            level = 'Experienced (8+ years)'
-        
-        return {
-            'years': round(experience_years, 1),
-            'level': level
-        }
+# Set 2
+QUESTIONS_SET2 = {
+    "floorplanning": [
+        "Your design contains 6 voltage domains with complex power sequencing requirements. How would you organize the floorplan to minimize domain crossings and simplify power grid design?",
+        "You're implementing a mesh clock distribution for a high-frequency design. Describe your floorplan strategy to support mesh clock architecture effectively.",
+        "Explain how you would handle floorplanning for a design with heavy datapath components (multipliers, ALUs). What placement strategies optimize timing and area?",
+        "Your chip has both digital and analog sections sharing the same substrate. Detail your floorplanning approach for noise isolation and substrate coupling prevention.",
+        "Describe your methodology for power grid planning in the floorplan stage. How do you ensure robust power delivery while minimizing resources?",
+        "You have a design with multiple hard IP blocks of different sizes. How would you approach the macro placement puzzle to maximize utilization?",
+        "Your floorplan must support dynamic voltage and frequency scaling (DVFS). What special considerations are needed in the floorplan?",
+        "Explain your approach to handling high-speed serial interfaces (SerDes) in the floorplan. What placement rules would you follow?",
+        "Your design has stringent thermal requirements. How would you modify the floorplan to improve heat dissipation and avoid hotspots?",
+        "Describe the floorplan considerations for a design targeting both high-performance and low-power variants from the same RTL.",
+        "You need to implement hardware security features. How does this impact your floorplanning decisions regarding isolation and shielding?",
+        "Your floorplan must accommodate multiple test modes including BIST and scan. Explain your planning for test access and routing.",
+        "How would you approach floorplanning for a chiplet-based design with die-to-die interfaces? What are the key considerations?",
+        "Describe your strategy for handling repeater planning during the floorplan stage. How do you predict and allocate repeater resources?",
+        "Your design requires specific aspect ratio and pin placement for package constraints. How do you balance these requirements with optimal floorplan?"
+    ],
+    "placement": [
+        "Your placement engine reports severe congestion despite low utilization. What investigation steps and fixes would you apply?",
+        "Describe your approach to timing-driven placement when dealing with multiple clock domains and false paths.",
+        "You have a datapath with regular structure. How would you leverage structured placement techniques for better QoR?",
+        "Explain your methodology for handling macro blockages and halos. How do you determine optimal spacing values?",
+        "Your design has critical nets requiring special attention. Describe net weighting strategies and their impact on placement.",
+        "How would you approach placement optimization for a design with significant on-chip variation (OCV) effects?",
+        "Your placement shows clustering of high-switching cells. What techniques would you use to distribute power consumption?",
+        "Describe your approach to placement when dealing with multiple power domains and always-on logic requirements.",
+        "You need to achieve specific timing for memory interfaces. How would you use placement constraints and techniques?",
+        "Explain how you would handle placement for cells with special requirements like antenna diodes or decap cells.",
+        "Your design has both timing-critical and power-critical paths. How do you balance placement optimization between these objectives?",
+        "Describe your methodology for incremental placement during ECO implementation. How do you minimize perturbation?",
+        "How would you optimize placement for better clock tree synthesis results? What placement preparation helps CTS?",
+        "Your placement must consider package-level constraints like bump locations. Explain your approach to this co-optimization.",
+        "Describe techniques for achieving uniform power rail utilization through placement optimization."
+    ],
+    "routing": [
+        "Your design fails routing due to severe congestion in specific layers. Describe layer-aware routing strategies to resolve this.",
+        "Explain your approach to shielding critical signals. When would you use coaxial shielding vs adjacent track shielding?",
+        "You have buses requiring matched delays. Describe techniques for achieving tight skew control during routing.",
+        "How would you handle routing for a design with restrictive DRC rules in advanced nodes? What strategies help convergence?",
+        "Your routing must meet strict electromagnetic interference (EMI) requirements. What routing techniques help minimize EMI?",
+        "Describe your approach to via optimization. How do you balance via count, resistance, and reliability concerns?",
+        "You need to route power meshes with IR drop constraints. Explain your methodology for power routing optimization.",
+        "How would you handle routing in the presence of pre-routed IP blocks? What are common integration challenges?",
+        "Your design has analog signals requiring special routing. Describe techniques for routing sensitive analog nets in a digital environment.",
+        "Explain your approach to handling crosstalk-induced delay variations. What routing techniques minimize timing uncertainty?",
+        "Describe routing strategies for designs with multiple metal stacks and different resistivity metals.",
+        "How would you approach routing optimization for manufacturing yield? What DFM rules impact routing decisions?",
+        "Your routing must consider stress effects and device performance. Explain stress-aware routing techniques.",
+        "Describe your methodology for achieving routing closure with minimum iterations. What metrics guide optimization?",
+        "How would you handle special routing requirements for power gating switches and isolation cells?"
+    ]
+}
 
-    def calculate_quality_score(self, text: str, domain_analysis: Dict, 
-                               experience_info: Dict) -> float:
-        """Calculate overall resume quality score"""
-        score = 0.0
-        
-        # Domain clarity (max 0.4)
-        score += min(0.4, domain_analysis['confidence'] * 0.4)
-        
-        # Experience clarity (max 0.3)
-        if experience_info['years'] > 0:
-            score += 0.3
-        elif experience_info['level'] == 'Fresher (0-2 years)':
-            score += 0.15
-        
-        # Text length and structure (max 0.3)
-        text_length = len(text)
-        if text_length > 500:
-            score += 0.1
-        if text_length > 1000:
-            score += 0.1
-        if text_length > 2000:
-            score += 0.1
-        
-        return round(score, 2)
+# Set 3
+QUESTIONS_SET3 = {
+    "floorplanning": [
+        "You're designing a multi-core processor with shared cache. Describe your floorplan strategy for minimizing cache access latency across cores.",
+        "Your floorplan must support partial reconfiguration regions. How would you partition and constrain the floorplan for this requirement?",
+        "Explain your approach to floorplanning when dealing with hard macro timing models that have significant uncertainty margins.",
+        "Your design includes high-bandwidth memory (HBM) interfaces. Describe floorplan considerations for HBM integration and signal routing.",
+        "How would you handle floorplanning for a design with stringent jitter requirements on multiple clock domains?",
+        "Your chip requires redundancy for yield improvement. Explain how redundancy requirements impact your floorplanning decisions.",
+        "Describe your methodology for creating a pin placement that optimizes both internal routing and package escape routing.",
+        "You need to floorplan a design with aggressive power targets using extensive power gating. How do you organize power domains?",
+        "Your floorplan must accommodate on-chip voltage regulators. What placement and isolation strategies would you employ?",
+        "Explain how you would approach floorplanning for testability, including placement of test compression logic and TAP controllers.",
+        "Your design has performance monitors and debug infrastructure. How do you integrate these into your floorplan efficiently?",
+        "Describe floorplan strategies for designs requiring radiation hardening or single-event upset (SEU) protection.",
+        "How would you optimize the floorplan for a design with multiple high-speed transceivers requiring careful power supply isolation?",
+        "Your floorplan needs to support both flip-chip and wire-bond package options. Explain your approach to this flexibility.",
+        "Describe considerations for floorplanning a design that will undergo metal-only ECOs. How do you prepare for changes?"
+    ],
+    "placement": [
+        "Your placement results show timing violations only in specific voltage-temperature corners. Describe your corner-specific optimization approach.",
+        "Explain how you would handle placement for a design with extensive clock domain crossing (CDC) logic. What clustering strategies help?",
+        "You need to optimize placement for routability while maintaining timing. Describe metrics and techniques to balance these goals.",
+        "Your design has memory arrays with strict access timing. How would you approach placement of memory interface logic?",
+        "Describe your methodology for placing spare cells for ECO purposes. How do you determine quantity and distribution?",
+        "How would you handle placement optimization when dealing with coupling-critical nets that affect functionality?",
+        "Your placement must consider electromigration rules from early stages. Explain how EM impacts placement decisions.",
+        "Describe techniques for achieving better placement QoR through floorplan feedback. What metrics drive floorplan updates?",
+        "You have a design with multiple test modes affecting timing. How do you ensure placement works across all modes?",
+        "Explain your approach to placing level shifters and isolation cells in a multi-voltage design for optimal area and timing.",
+        "Your placement shows local congestion around certain macros. Describe techniques to relieve congestion without impacting timing.",
+        "How would you optimize placement for designs with significant useful skew requirements? What constraints and techniques apply?",
+        "Describe your approach to placement when dealing with substrate noise-sensitive analog blocks integrated with digital logic.",
+        "Your design requires specific placement for security features. How do you balance security requirements with PPA goals?",
+        "Explain placement strategies for achieving uniform dynamic IR drop across the design. What factors do you consider?"
+    ],
+    "routing": [
+        "Your routing faces severe congestion with multiple hotspots. Describe a systematic approach using global route guides and modifications.",
+        "Explain advanced techniques for routing differential signals in the presence of obstacles while maintaining signal integrity.",
+        "You need to achieve specific impedance targets for high-speed interfaces. Describe your routing methodology and verification approach.",
+        "How would you handle routing for a design with extensive bus structures requiring length matching within 1% tolerance?",
+        "Your design has power delivery network (PDN) resonance issues. Describe routing techniques to improve PDN impedance.",
+        "Explain your approach to routing clock networks with non-default rules while managing transition times and duty cycle.",
+        "Describe techniques for routing in designs with triple or quadruple patterning requirements. How do you handle coloring conflicts?",
+        "You have nets switching simultaneously causing power integrity issues. How would you modify routing to reduce simultaneous switching?",
+        "Your routing must meet reliability requirements including antenna and via reliability. Describe comprehensive checking methodology.",
+        "How would you approach routing optimization for thermal management? What routing strategies help spread heat generation?",
+        "Explain routing techniques for designs with embedded FPGA or programmable logic blocks requiring special interconnect.",
+        "Your design has strict requirements for matched propagation delays on buses. Describe routing techniques beyond length matching.",
+        "How would you handle routing challenges in 3D-IC or interposer-based designs? What special considerations apply?",
+        "Describe your approach to routing optimization when dealing with process variation effects on different metal layers.",
+        "Explain strategies for achieving routing closure when facing manufacturing constraints like via pillars or metal density rules."
+    ]
+}
 
-    def analyze_content(self, text: str, filename: str) -> Dict[str, Any]:
-        """Enhanced content analysis with better classification"""
-        try:
-            if not text or len(text) < 100:
-                return {
-                    'is_resume': False,
-                    'confidence': 0,
-                    'reason': 'Insufficient text content'
-                }
-            
-            # Check if it's actually a resume
-            resume_check = self.is_resume(text)
-            if not resume_check['is_resume']:
-                return resume_check
-            
-            # Analyze domains with enhanced scoring
-            domain_analysis = self.analyze_domains(text)
-            
-            # Extract experience information
-            experience_info = self.extract_experience(text)
-            
-            # Calculate overall resume quality score
-            quality_score = self.calculate_quality_score(
-                text, domain_analysis, experience_info
-            )
-            
-            return {
-                'is_resume': True,
-                'confidence': resume_check['confidence'],
-                'domain': domain_analysis['primary_domain'],
-                'domain_confidence': domain_analysis['confidence'],
-                'all_domains': domain_analysis['all_domains'],
-                'experience_level': experience_info['level'],
-                'experience_years': experience_info['years'],
-                'quality_score': quality_score,
-                'analysis_timestamp': datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            return {
-                'is_resume': False,
-                'confidence': 0,
-                'error': str(e),
-                'reason': 'Analysis failed'
-            }
+# Set 4
+QUESTIONS_SET4 = {
+    "floorplanning": [
+        "Your design requires integration of third-party encrypted IP. How does this impact your floorplanning approach and optimization capabilities?",
+        "Describe your methodology for floorplanning a network-on-chip (NoC) based design. How do you optimize for latency and throughput?",
+        "You're working on an AI accelerator with large systolic arrays. Explain your floorplan strategy for dataflow optimization.",
+        "How would you approach floorplanning for a design with multiple asynchronous clock domains and metastability concerns?",
+        "Your floorplan must support in-field diagnostic capabilities. What considerations are needed for access and isolation?",
+        "Describe floorplanning challenges and solutions when dealing with ultra-low power designs using aggressive voltage scaling.",
+        "You need to create a floorplan supporting both performance and area-optimized versions. Explain your parameterizable approach.",
+        "How would you handle floorplanning for designs with significant repeater and buffer requirements? Describe resource planning.",
+        "Your design includes custom analog blocks with specific orientation requirements. How do you accommodate these in digital floorplan?",
+        "Explain your approach to floorplanning when dealing with hard macros that have multiple power domains internally.",
+        "Describe methodology for creating floorplans that are portable across different technology nodes with minimal changes.",
+        "Your floorplan must accommodate future derivative designs. How do you build flexibility while meeting current targets?",
+        "How would you approach floorplanning for designs requiring hardware root-of-trust and secure enclaves?",
+        "Explain floorplan optimization techniques when dealing with designs having multiple voltage regulators and power switches.",
+        "Describe your approach to validating floorplan quality early using virtual prototypes before detailed implementation."
+    ],
+    "placement": [
+        "Your placement optimization is limited by long runtime. Describe techniques to improve placement efficiency without sacrificing QoR.",
+        "Explain how machine learning techniques can be applied to placement optimization. What features and models are effective?",
+        "You're dealing with a sea-of-gates style placement with minimal structure. How do you guide placement for optimal results?",
+        "Describe your approach to placement when handling designs with dynamic power management and multiple operating modes.",
+        "How would you optimize placement for designs with significant IR drop concerns? What early analysis guides placement?",
+        "Your placement must consider package and board-level constraints. Explain co-design considerations affecting placement.",
+        "Describe techniques for achieving placement closure when dealing with conflicting constraints from multiple design teams.",
+        "How would you handle placement for designs with embedded test structures like memory BIST and logic BIST?",
+        "Explain your methodology for placing designs with fine-grained power gating. How do you handle sleep transistor placement?",
+        "Your placement faces challenges from irregular floorplans. Describe techniques to achieve good QoR despite constraints.",
+        "How would you approach placement optimization for designs targeting multiple process corners with different characteristics?",
+        "Describe placement strategies when dealing with soft error rate (SER) requirements. How do you optimize for reliability?",
+        "Your design has placement restrictions due to export control requirements. How do you handle security-driven constraints?",
+        "Explain techniques for incremental placement optimization late in the design cycle without full re-placement.",
+        "How would you validate placement quality using static analysis before moving to routing? What checks are critical?"
+    ],
+    "routing": [
+        "Your routing is failing due to complex pin access issues in advanced nodes. Describe systematic approaches to improve pin access.",
+        "Explain your methodology for routing power networks in designs with hundreds of power domains. How do you manage complexity?",
+        "You need to implement redundant routing for critical nets. Describe techniques and trade-offs for redundancy implementation.",
+        "How would you approach routing optimization for designs with extensive use of via ladders and stacked vias?",
+        "Your routing must meet stringent coupling capacitance targets. Describe extraction and optimization techniques for coupling reduction.",
+        "Explain routing strategies for designs with non-Manhattan geometries. When are 45-degree routes beneficial?",
+        "Describe your approach to routing when dealing with designs having IP blocks with different routing track definitions.",
+        "How would you handle routing optimization for multi-die integration using silicon interposers or bridges?",
+        "Your design requires specific routing for security features like shields and guards. Explain implementation strategies.",
+        "Describe techniques for achieving routing closure with multiple metal layer options having different RC characteristics.",
+        "How would you optimize routing for designs with critical electrostatic discharge (ESD) protection requirements?",
+        "Explain your methodology for routing verification including LVS, antenna, and reliability checks. What tools and flows are used?",
+        "Your routing must consider future metal layer reduction for cost. How do you prepare for layer reduction ECOs?",
+        "Describe approaches to routing optimization when dealing with statistical timing analysis and variation-aware timing.",
+        "How would you handle routing challenges in designs with extensive use of low-power techniques like MTCMOS and power gating?"
+    ]
+}
 
+# Combine all question sets
+QUESTION_SETS = [QUESTIONS_SET1, QUESTIONS_SET2, QUESTIONS_SET3, QUESTIONS_SET4]
 
-class VLSIResumeScanner:
-    def __init__(self):
-        self.credentials = None
-        self.gmail_service = None
-        self.drive_service = None
-        self.logs = []
-        self.max_logs = 1000
-        self.stats = {
-            'total_emails': 0,
-            'resumes_found': 0,
-            'last_scan_time': None,
-            'processing_errors': 0
-        }
-        self.resume_folder_id = None
-        self.processed_folder_id = None
-        self.domain_folders = {
-            'Physical Design': None,
-            'Design Verification': None, 
-            'DFT': None,
-            'RTL Design': None,
-            'Analog Design': None,
-            'FPGA': None,
-            'Silicon Validation': None,
-            'Mixed Signal': None,
-            'General VLSI': None,
-            'Unknown Domain': None
-        }
-        self.current_user_email = None
-        self.user_credentials = {}
-        self._oauth_flow = None
-        
-        # Initialize enhanced analyzer
-        self.enhanced_analyzer = EnhancedResumeAnalyzer()
-        
-        # Add new statistics tracking
-        self.classification_stats = {
-            'total_analyzed': 0,
-            'correctly_classified': 0,
-            'false_positives': 0,
-            'domains': {}
-        }
-        
-    def add_log(self, message: str, level: str = 'info'):
-        """Add a log entry with timestamp"""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        log_entry = {
-            'timestamp': timestamp,
-            'level': level,
-            'message': message
-        }
-        self.logs.append(log_entry)
-        
-        if len(self.logs) > self.max_logs:
-            self.logs = self.logs[-self.max_logs:]
-        
-        if level == 'error':
-            logging.error(f"[{timestamp}] {message}")
-        elif level == 'warning':
-            logging.warning(f"[{timestamp}] {message}")
-        else:
-            logging.info(f"[{timestamp}] {message}")
+# Track which set each engineer gets
+engineer_question_sets = {}
 
-    def authenticate_google_apis(self, user_email: str = None) -> bool:
-        """Authenticate with Google APIs"""
-        try:
-            creds = None
-            
-            # Try to load existing token
-            token_file = 'token.json'
-            if user_email:
-                token_file = f'token_{user_email.replace("@", "_").replace(".", "_")}.json'
-            
-            if os.path.exists(token_file):
-                try:
-                    creds = Credentials.from_authorized_user_file(token_file, SCOPES)
-                    self.add_log(f"🔐 Loaded existing token", 'info')
-                except Exception as e:
-                    self.add_log(f"⚠️ Could not load token: {e}", 'warning')
-            
-            # If credentials are invalid, start OAuth flow
-            if not creds or not creds.valid:
-                if creds and creds.expired and creds.refresh_token:
-                    try:
-                        creds.refresh(Request())
-                        self.add_log("🔄 Refreshed expired token", 'info')
-                    except Exception as e:
-                        self.add_log(f"❌ Token refresh failed: {e}", 'error')
-                        creds = None
-                
-                if not creds:
-                    return self._run_oauth_flow(user_email)
-            
-            # Test the credentials
-            self.credentials = creds
-            return self._test_credentials()
-            
-        except Exception as e:
-            self.add_log(f"❌ Authentication failed: {e}", 'error')
-            return False
+# Keywords for auto-scoring (updated for all 4 sets)
+ANSWER_KEYWORDS = {
+    "floorplanning": {
+        # Set 1 keywords
+        0: ["macro placement", "timing", "power", "utilization", "power delivery", "IR drop", "blockage", "pins", "orientation", "dataflow"],
+        1: ["setup violations", "timing paths", "floorplan", "critical paths", "placement", "buffers", "repeaters", "pipeline", "hierarchy", "partition"],
+        2: ["congestion", "routing", "density", "spreading", "blockages", "channels", "utilization", "cell density", "padding", "keep-out"],
+        # Set 2 keywords
+        3: ["voltage domains", "level shifter", "power grid", "isolation", "domain crossing", "power planning", "multi-voltage", "always-on", "shutdown", "interface"],
+        4: ["clock domains", "clock tree", "skew", "latency", "synchronization", "CDC", "metastability", "clock gating", "mesh", "H-tree"],
+        5: ["memory placement", "access time", "pin alignment", "data flow", "power straps", "decap", "timing critical", "bus routing", "periphery", "clustering"],
+        # Set 3 keywords
+        6: ["IR drop", "power grid", "mesh density", "via pillars", "current density", "electromigration", "power straps", "decap cells", "voltage", "resistance"],
+        7: ["die area", "utilization", "aspect ratio", "channel width", "macro spacing", "standard cell", "optimization", "timing margin", "risk", "iterations"],
+        8: ["mixed-signal", "noise isolation", "guard rings", "substrate", "digital noise", "analog", "shielding", "separate supplies", "deep n-well", "distance"],
+        # Set 4 keywords
+        9: ["congestion map", "global route", "heat map", "trial route", "density screens", "fly lines", "pin density", "track utilization", "gcell", "overflow"],
+        10: ["hierarchical", "partition", "interface logic", "feedthrough", "pin assignment", "budgeting", "black box", "timing model", "boundary", "repeaters"],
+        11: ["scan chains", "DFT", "test mode", "scan flops", "compression", "test time", "wire length", "shift power", "launch capture", "scan routing"]
+    },
+    "placement": {
+        # Set 1 keywords
+        0: ["timing violations", "negative slack", "optimization", "critical paths", "placement", "setup", "hold", "clock", "incremental", "ECO"],
+        1: ["congestion", "hotspots", "spreading", "density", "padding", "blockages", "magnet placement", "guides", "regions", "utilization"],
+        2: ["high-fanout", "buffer tree", "cloning", "load splitting", "placement", "clustering", "net weights", "timing", "physical synthesis", "optimization"],
+        # Set 2 keywords
+        3: ["global placement", "detailed placement", "legalization", "optimization", "wirelength", "timing driven", "congestion driven", "overlap removal", "spreading", "refinement"],
+        4: ["leakage power", "LVT", "HVT", "threshold voltage", "cell swapping", "power optimization", "clustering", "activity", "temperature", "multi-Vt"],
+        5: ["voltage islands", "level shifters", "isolation cells", "retention", "power domains", "always-on", "interface", "power state", "boundary", "crossing"],
+        # Set 3 keywords
+        6: ["hold violations", "buffer insertion", "min delay", "clock skew", "useful skew", "hold margin", "corner analysis", "multi-corner", "OCV", "CPPR"],
+        7: ["long routes", "path analysis", "net viewer", "flight lines", "placement density", "spreading", "guides", "soft blockages", "net weights", "critical nets"],
+        8: ["clock gating", "enable timing", "placement", "clock tree", "activity", "power savings", "setup check", "glitch", "ICG", "proximity"],
+        # Set 4 keywords
+        9: ["multi-mode", "scenario", "performance mode", "low power mode", "DVFS", "placement strategy", "optimization", "constraints", "cell selection", "operating points"],
+        10: ["cell density", "utilization", "hot spots", "spreading", "target density", "overflow", "legalization", "detailed placement", "uniformity", "gradients"],
+        11: ["multi-corner", "MCMM", "setup timing", "hold timing", "worst corner", "optimization", "scenario merging", "common path", "margin", "sign-off"]
+    },
+    "routing": {
+        # Set 1 keywords
+        0: ["DRC violations", "spacing", "via", "width", "metal", "tracks", "reroute", "ECO", "search repair", "manual fixes"],
+        1: ["differential pairs", "impedance", "matching", "shielding", "spacing", "length matching", "skew", "routing", "symmetry", "guard rings"],
+        2: ["timing degradation", "parasitics", "RC delay", "crosstalk", "coupling", "optimization", "layer assignment", "via optimization", "buffer", "sizing"],
+        # Set 2 keywords
+        3: ["routing congestion", "detour", "layer assignment", "track utilization", "global route", "detailed route", "spreading", "guides", "overflow", "iterations"],
+        4: ["power routing", "IR drop", "EM rules", "via arrays", "width", "current density", "mesh", "straps", "star route", "trunk routing"],
+        5: ["layer constraints", "preferred direction", "track offset", "via stack", "routing resources", "metal stack", "NDR", "shielding", "keep-out", "blockages"],
+        # Set 3 keywords
+        6: ["crosstalk", "coupling capacitance", "aggressor", "victim", "shielding", "spacing", "NDR", "switching window", "noise margin", "parallel run"],
+        7: ["clock routing", "skew", "latency", "NDR rules", "shielding", "spine", "mesh", "H-tree", "balanced", "buffer placement"],
+        8: ["electromigration", "current density", "wire width", "via count", "temperature", "lifetime", "redundant vias", "tapering", "EM rules", "stress"],
+        # Set 4 keywords
+        9: ["double patterning", "coloring", "decomposition", "odd cycle", "conflict", "stitching", "mask assignment", "spacing", "litho", "manufacturing"],
+        10: ["antenna violations", "PAE", "CAR", "diode insertion", "metal jumping", "layer hopping", "gate oxide", "charge accumulation", "ratio", "process antenna"],
+        11: ["ECO routing", "minimal impact", "preserve routing", "incremental", "freeze silicon", "metal fix", "spare cells", "rip-up", "reroute", "timing"]
+    }
+}
 
-    def _run_oauth_flow(self, user_email: str = None) -> bool:
-        """Run OAuth flow for new authentication"""
-        try:
-            # Get credentials from environment variables
-            client_id = os.environ.get('GOOGLE_CLIENT_ID')
-            client_secret = os.environ.get('GOOGLE_CLIENT_SECRET')
-            project_id = os.environ.get('GOOGLE_PROJECT_ID')
-            
-            if not all([client_id, client_secret, project_id]):
-                self.add_log("❌ Missing OAuth credentials in environment variables", 'error')
-                return False
-            
-            credentials_dict = {
-                "installed": {
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost"]
-                }
-            }
-            
-            # Create OAuth flow
-            flow = InstalledAppFlow.from_client_config(
-                credentials_dict, 
-                SCOPES,
-                redirect_uri='urn:ietf:wg:oauth:2.0:oob'
-            )
-            
-            self._oauth_flow = flow
-            
-            # Generate auth URL
-            auth_url, _ = flow.authorization_url(
-                access_type='offline',
-                prompt='select_account',
-                include_granted_scopes='true'
-            )
-            
-            self.add_log("🌐 OAuth authorization required", 'info')
-            self.add_log(f"📋 Authorization URL: {auth_url}", 'info')
-            self.add_log("1️⃣ Copy the URL above and open in browser", 'info')
-            self.add_log("2️⃣ Select your Gmail account", 'info')
-            self.add_log("3️⃣ Complete Google authorization", 'info')
-            self.add_log("4️⃣ Copy the authorization code", 'info')
-            self.add_log("5️⃣ Enter it in the form below", 'info')
-            
-            return False  # Indicates manual intervention needed
-            
-        except Exception as e:
-            self.add_log(f"❌ OAuth flow failed: {e}", 'error')
-            return False
+# Helper function to get questions for an engineer
+def get_questions_for_engineer(engineer_id, topic):
+    """Get unique question set for engineer"""
+    if engineer_id not in engineer_question_sets:
+        # Assign a question set (rotate through sets)
+        engineer_num = int(engineer_id[-3:]) - 1  # Extract number from eng001, eng002, etc.
+        set_index = engineer_num % len(QUESTION_SETS)
+        engineer_question_sets[engineer_id] = set_index
+    
+    set_index = engineer_question_sets[engineer_id]
+    return QUESTION_SETS[set_index][topic]
 
-    def _test_credentials(self) -> bool:
-        """Test the credentials by making API calls"""
-        try:
-            self.gmail_service = build('gmail', 'v1', credentials=self.credentials)
-            result = self.gmail_service.users().getProfile(userId='me').execute()
-            email = result.get('emailAddress', 'Unknown')
-            self.add_log(f"✅ Gmail access confirmed for: {email}", 'success')
-            
-            self.drive_service = build('drive', 'v3', credentials=self.credentials)
-            about = self.drive_service.about().get(fields='user').execute()
-            drive_email = about.get('user', {}).get('emailAddress', 'Unknown')
-            self.add_log(f"✅ Drive access confirmed for: {drive_email}", 'success')
-            
-            # Save credentials
-            with open('token.json', 'w') as token:
-                token.write(self.credentials.to_json())
-            self.add_log("💾 Saved authentication token", 'success')
-            
-            self.current_user_email = email
-            self.user_credentials[email] = self.credentials
-            
-            return True
-            
-        except Exception as e:
-            self.add_log(f"❌ Credential test failed: {e}", 'error')
-            return False
+# Helper function to get keyword index for auto-scoring
+def get_keyword_index(engineer_id, question_index):
+    """Get the correct keyword index based on engineer's question set"""
+    set_index = engineer_question_sets.get(engineer_id, 0)
+    return set_index * 15 + question_index  # Each set has 15 questions
 
-    def setup_drive_folders(self) -> bool:
-        """Create necessary folders in Google Drive"""
-        try:
-            if not self.drive_service:
-                return False
-            
-            self.add_log("📁 Setting up Drive folders", 'info')
-            
-            # Create main folder
-            query = "name='VLSI Resume Scanner' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-            results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
-            
-            if results.get('files'):
-                parent_folder_id = results['files'][0]['id']
-                self.add_log("✅ Found existing parent folder", 'success')
-            else:
-                parent_metadata = {
-                    'name': 'VLSI Resume Scanner',
-                    'mimeType': 'application/vnd.google-apps.folder'
-                }
-                parent_folder = self.drive_service.files().create(body=parent_metadata, fields='id').execute()
-                parent_folder_id = parent_folder.get('id')
-                self.add_log("✅ Created parent folder", 'success')
-            
-            # Create resumes folder
-            resume_query = f"name='Resumes by Domain' and parents in '{parent_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-            resume_results = self.drive_service.files().list(q=resume_query, fields="files(id, name)").execute()
-            
-            if resume_results.get('files'):
-                self.resume_folder_id = resume_folder.get('id')
-                self.add_log("✅ Created Resumes folder", 'success')
-            
-            # Create domain folders
-            domains = ['Physical Design', 'Design Verification', 'DFT', 'RTL Design', 'Analog Design', 'FPGA', 'Silicon Validation', 'Mixed Signal', 'General VLSI', 'Unknown Domain']
-            
-            for domain in domains:
-                folder_query = f"name='{domain}' and parents in '{self.resume_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-                folder_results = self.drive_service.files().list(q=folder_query, fields="files(id, name)").execute()
-                
-                if folder_results.get('files'):
-                    self.domain_folders[domain] = folder_results['files'][0]['id']
-                    self.add_log(f"✅ Found folder: {domain}", 'success')
-                else:
-                    folder_metadata = {
-                        'name': domain,
-                        'parents': [self.resume_folder_id],
-                        'mimeType': 'application/vnd.google-apps.folder'
-                    }
-                    folder = self.drive_service.files().create(body=folder_metadata, fields='id').execute()
-                    self.domain_folders[domain] = folder.get('id')
-                    self.add_log(f"✅ Created folder: {domain}", 'success')
-                    
-                    # Create experience subfolders
-                    for exp_level in ['Fresher (0-2 years)', 'Mid-Level (2-5 years)', 'Senior (5-8 years)', 'Experienced (8+ years)']:
-                        exp_metadata = {
-                            'name': exp_level,
-                            'parents': [folder.get('id')],
-                            'mimeType': 'application/vnd.google-apps.folder'
-                        }
-                        self.drive_service.files().create(body=exp_metadata, fields='id').execute()
-            
-            return True
-            
-        except Exception as e:
-            self.add_log(f"❌ Drive setup failed: {e}", 'error')
-            return False
+# Scoring rubric
+SCORING_RUBRIC = {
+    10: "Excellent - Comprehensive answer with deep understanding",
+    8: "Very Good - Covers most key points with good detail",
+    6: "Good - Basic understanding with some key points",
+    4: "Fair - Limited understanding, missing key concepts",
+    2: "Poor - Minimal understanding shown",
+    0: "No answer or completely incorrect"
+}
 
-    def scan_emails(self, max_results: int = None) -> Dict[str, Any]:
-        """Scan Gmail for resume attachments"""
-        try:
-            if not self.gmail_service:
-                return {'success': False, 'error': 'Gmail service not available'}
-            
-            self.add_log(f"🔍 Starting Gmail scan", 'info')
-            
-            # Search for emails with attachments
-            query = 'has:attachment (filename:pdf OR filename:doc OR filename:docx)'
-            if max_results:
-                query += f' newer_than:30d'
-            
-            result = self.gmail_service.users().messages().list(
-                userId='me',
-                q=query,
-                maxResults=min(50, max_results or 50)
-            ).execute()
-            
-            messages = result.get('messages', [])
-            self.add_log(f"📧 Found {len(messages)} emails with attachments", 'info')
-            
-            resumes_found = 0
-            processed_count = 0
-            
-            for i, message in enumerate(messages, 1):
-                try:
-                    self.add_log(f"📨 Processing email {i}/{len(messages)}", 'info')
-                    result = self.process_email(message['id'])
-                    
-                    if result.get('has_resume'):
-                        resumes_found += 1
-                        
-                    processed_count += 1
-                    
-                    if i % 5 == 0:
-                        time.sleep(1)  # Rate limiting
-                        
-                except Exception as e:
-                    self.add_log(f"❌ Error processing email {i}: {e}", 'error')
-                    self.stats['processing_errors'] += 1
-                    continue
-            
-            # Update stats
-            self.stats['total_emails'] = processed_count
-            self.stats['resumes_found'] = resumes_found
-            self.stats['last_scan_time'] = datetime.now().isoformat()
-            
-            self.add_log(f"✅ Scan completed: {processed_count} emails, {resumes_found} resumes", 'success')
-            
-            return {
-                'success': True,
-                'processed': processed_count,
-                'resumes_found': resumes_found,
-                'stats': self.stats
-            }
-            
-        except Exception as e:
-            self.add_log(f"❌ Email scan failed: {e}", 'error')
-            return {'success': False, 'error': str(e)}
+# Helper functions
+def calculate_auto_score(answer, topic, question_index, engineer_id):
+    """Calculate auto-score based on keywords"""
+    if not answer:
+        return 0
+    
+    answer_lower = answer.lower()
+    keywords_found = 0
+    
+    # Get correct keyword index based on engineer's question set
+    keyword_index = get_keyword_index(engineer_id, question_index)
+    
+    if topic in ANSWER_KEYWORDS and keyword_index < len(ANSWER_KEYWORDS[topic]):
+        keywords = ANSWER_KEYWORDS[topic][keyword_index]
+        for keyword in keywords:
+            if keyword.lower() in answer_lower:
+                keywords_found += 1
+    
+    # 2 points per keyword, max 10 points
+    return min(keywords_found * 2, 10)
 
-    def process_email(self, message_id: str) -> Dict[str, Any]:
-        """Process a single email for resume attachments"""
-        try:
-            message = self.gmail_service.users().messages().get(userId='me', id=message_id).execute()
-            
-            headers = message['payload'].get('headers', [])
-            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
-            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
-            date_header = next((h['value'] for h in headers if h['name'] == 'Date'), '')
-            
-            # Check for attachments
-            attachments = []
-            if 'parts' in message['payload']:
-                for part in message['payload']['parts']:
-                    filename = part.get('filename', '').lower()
-                    if filename and (filename.endswith('.pdf') or filename.endswith('.doc') or filename.endswith('.docx')):
-                        if 'body' in part and 'attachmentId' in part['body']:
-                            attachments.append({
-                                'filename': part['filename'],
-                                'attachment_id': part['body']['attachmentId'],
-                                'size': part['body'].get('size', 0),
-                                'type': 'pdf' if filename.endswith('.pdf') else 'doc'
-                            })
-            
-            has_resume = False
-            processed_attachments = []
-            
-            for attachment in attachments:
-                try:
-                    # Download attachment
-                    att = self.gmail_service.users().messages().attachments().get(
-                        userId='me',
-                        messageId=message_id,
-                        id=attachment['attachment_id']
-                    ).execute()
-                    
-                    data = base64.urlsafe_b64decode(att['data'])
-                    
-                    # Analyze content
-                    analysis_result = self.analyze_content(data, attachment['filename'])
-                    
-                    if analysis_result and analysis_result.get('is_resume', False):
-                        has_resume = True
-                        
-                        # Save to Drive
-                        drive_file_id = self.save_to_drive(
-                            data,
-                            attachment['filename'],
-                            {
-                                'subject': subject,
-                                'sender': sender,
-                                'date': date_header,
-                                'analysis_result': analysis_result
-                            }
-                        )
-                        
-                        processed_attachments.append({
-                            'filename': attachment['filename'],
-                            'domain': analysis_result.get('domain', 'Unknown Domain'),
-                            'experience': analysis_result.get('experience_level', 'Unknown'),
-                            'score': analysis_result.get('resume_score', 0),
-                            'drive_file_id': drive_file_id
-                        })
-                    
-                except Exception as e:
-                    self.add_log(f"❌ Error processing {attachment['filename']}: {e}", 'error')
-                    continue
-            
-            return {
-                'message_id': message_id,
-                'subject': subject,
-                'sender': sender,
-                'date': date_header,
-                'has_resume': has_resume,
-                'attachments': processed_attachments
-            }
-            
-        except Exception as e:
-            self.add_log(f"❌ Error processing email {message_id}: {e}", 'error')
-            return {'message_id': message_id, 'error': str(e)}
+def create_assignment(engineer_id, topic):
+    global assignment_counter
+    
+    user = users.get(engineer_id)
+    if not user or topic not in QUESTIONS_SET1:
+        return None
+    
+    assignment_counter += 1
+    assignment_id = f"PD_{topic.upper()}_{engineer_id}_{assignment_counter}"
+    
+    # Get unique questions for this engineer
+    questions = get_questions_for_engineer(engineer_id, topic)
+    
+    assignment = {
+        'id': assignment_id,
+        'engineer_id': engineer_id,
+        'topic': topic,
+        'questions': questions,
+        'answers': {},
+        'auto_scores': {},  # Auto-calculated scores
+        'final_scores': {},  # Admin's final scores
+        'status': 'pending',  # pending -> submitted -> under_review -> published
+        'created_date': datetime.now().isoformat(),
+        'due_date': (datetime.now() + timedelta(days=3)).isoformat(),
+        'total_score': None,
+        'scored_by': None,
+        'scored_date': None,
+        'published_date': None
+    }
+    
+    assignments[assignment_id] = assignment
+    
+    # Create notification
+    if engineer_id not in notifications:
+        notifications[engineer_id] = []
+    
+    notifications[engineer_id].append({
+        'title': f'New {topic} Assignment',
+        'message': f'15 questions for 3+ years experience, due in 3 days',
+        'created_at': datetime.now().isoformat()
+    })
+    
+    return assignment
 
-    def analyze_content(self, file_data: bytes, filename: str) -> Dict[str, Any]:
-        """Enhanced content analysis with better classification"""
-        try:
-            # Extract text using existing methods
-            text = ""
-            if filename.lower().endswith('.pdf'):
-                text = self.extract_pdf_text(file_data)
-            elif filename.lower().endswith('.docx'):
-                text = self.extract_docx_text(file_data, filename)
-            elif filename.lower().endswith('.doc'):
-                text = self.extract_doc_text(file_data, filename)
-            
-            if not text:
-                self.add_log(f"⚠️ No text extracted from {filename}", 'warning')
-                return {
-                    'is_resume': False,
-                    'domain': 'Unknown Domain',
-                    'experience_level': 'Unknown',
-                    'resume_score': 0,
-                    'rejection_reason': 'No text content'
-                }
-            
-            # Use enhanced analysis
-            result = self.enhanced_analyzer.analyze_content(text, filename)
-            
-            # Update statistics
-            self.classification_stats['total_analyzed'] += 1
-            
-            # Format result for compatibility with existing code
-            if result['is_resume']:
-                # Track domain statistics
-                domain = result['domain']
-                if domain not in self.classification_stats['domains']:
-                    self.classification_stats['domains'][domain] = 0
-                self.classification_stats['domains'][domain] += 1
-                
-                # Log detailed analysis info
-                self.add_log(
-                    f"✅ Resume detected: {filename} | "
-                    f"Domain: {domain} (confidence: {result['domain_confidence']:.2f}) | "
-                    f"Experience: {result['experience_level']} | "
-                    f"Quality: {result['quality_score']:.2f}",
-                    'success'
-                )
-                
-                # Log additional domains if found
-                if len(result.get('all_domains', [])) > 1:
-                    other_domains = [d['domain'] for d in result['all_domains'][1:] if d['score'] > 5]
-                    if other_domains:
-                        self.add_log(
-                            f"   Also matches: {', '.join(other_domains)}",
-                            'info'
-                        )
-                
-                return {
-                    'is_resume': True,
-                    'domain': domain,
-                    'experience_level': result['experience_level'],
-                    'experience_years': result['experience_years'],
-                    'resume_score': result['quality_score'],
-                    'enhanced_analysis': result  # Keep full analysis for reference
-                }
-            else:
-                self.classification_stats['false_positives'] += 1
-                self.add_log(
-                    f"❌ Rejected {filename}: {result.get('reason', 'Not a resume')} "
-                    f"(confidence: {result.get('confidence', 0):.2f})",
-                    'warning'
-                )
-                return {
-                    'is_resume': False,
-                    'domain': 'Unknown Domain',
-                    'experience_level': 'Unknown',
-                    'resume_score': 0,
-                    'rejection_reason': result.get('reason', 'Not a resume')
-                }
-                
-        except Exception as e:
-            self.add_log(f"❌ Error analyzing {filename}: {e}", 'error')
-            return {
-                'is_resume': False,
-                'domain': 'Unknown Domain',
-                'experience_level': 'Unknown',
-                'resume_score': 0,
-                'rejection_reason': f'Analysis error: {str(e)}'
-            }
-
-    def extract_pdf_text(self, pdf_data: bytes) -> str:
-        """Extract text from PDF"""
-        try:
-            if not PDF_PROCESSING_AVAILABLE:
-                return ""
-            
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
-                temp_file.write(pdf_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                try:
-                    import pdfplumber
-                    with pdfplumber.open(temp_file_path) as pdf:
-                        text = ""
-                        for page in pdf.pages:
-                            page_text = page.extract_text()
-                            if page_text:
-                                text += page_text + "\n"
-                    return text
-                except ImportError:
-                    import PyPDF2
-                    with open(temp_file_path, 'rb') as file:
-                        pdf_reader = PyPDF2.PdfReader(file)
-                        text = ""
-                        for page in pdf_reader.pages:
-                            text += page.extract_text() + "\n"
-                    return text
-            finally:
-                os.unlink(temp_file_path)
-                
-        except Exception as e:
-            self.add_log(f"❌ PDF extraction failed: {e}", 'error')
-            return ""
-
-    def extract_docx_text(self, doc_data: bytes, filename: str) -> str:
-        """Extract text from DOCX"""
-        try:
-            if not DOCX_PROCESSING_AVAILABLE:
-                return ""
-            
-            with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as temp_file:
-                temp_file.write(doc_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                doc = Document(temp_file_path)
-                text = ""
-                for paragraph in doc.paragraphs:
-                    text += paragraph.text + "\n"
-                return text
-            finally:
-                os.unlink(temp_file_path)
-                
-        except Exception as e:
-            self.add_log(f"❌ DOCX extraction failed: {e}", 'error')
-            return ""
-
-    def extract_doc_text(self, doc_data: bytes, filename: str) -> str:
-        """Extract text from DOC"""
-        try:
-            if not DOC_PROCESSING_AVAILABLE:
-                return ""
-            
-            with tempfile.NamedTemporaryFile(suffix='.doc', delete=False) as temp_file:
-                temp_file.write(doc_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                import docx2txt
-                text = docx2txt.process(temp_file_path)
-                return text
-            finally:
-                os.unlink(temp_file_path)
-                
-        except Exception as e:
-            self.add_log(f"❌ DOC extraction failed: {e}", 'error')
-            return ""
-
-    def save_to_drive(self, file_data: bytes, filename: str, metadata: Dict) -> Optional[str]:
-        """Enhanced save to Google Drive with additional metadata"""
-        try:
-            if not self.drive_service:
-                return None
-            
-            analysis = metadata.get('analysis_result', {})
-            enhanced = analysis.get('enhanced_analysis', {})
-            domain = analysis.get('domain', 'Unknown Domain')
-            experience_level = analysis.get('experience_level', 'Unknown')
-            experience_years = analysis.get('experience_years', 0)
-            
-            # Get domain folder
-            domain_folder_id = self.domain_folders.get(domain, self.domain_folders.get('Unknown Domain'))
-            
-            # Find experience subfolder
-            exp_folder_query = f"name='{experience_level}' and parents in '{domain_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-            exp_results = self.drive_service.files().list(q=exp_folder_query, fields="files(id, name)").execute()
-            
-            if exp_results.get('files'):
-                target_folder_id = exp_results['files'][0]['id']
-            else:
-                # Create experience subfolder
-                exp_metadata = {
-                    'name': experience_level,
-                    'parents': [domain_folder_id],
-                    'mimeType': 'application/vnd.google-apps.folder'
-                }
-                exp_folder = self.drive_service.files().create(body=exp_metadata, fields='id').execute()
-                target_folder_id = exp_folder.get('id')
-            
-            # Create enhanced filename with quality score
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            file_extension = filename.split('.')[-1].lower()
-            clean_filename = filename.replace(f'.{file_extension}', '')
-            
-            domain_abbrev = {
-                'Physical Design': 'PD', 'Design Verification': 'DV', 'DFT': 'DFT',
-                'RTL Design': 'RTL', 'Analog Design': 'ANA', 'FPGA': 'FPGA',
-                'Silicon Validation': 'SiVal', 'Mixed Signal': 'MS',
-                'General VLSI': 'VLSI', 'Unknown Domain': 'UNK'
-            }.get(domain, 'UNK')
-            
-            exp_abbrev = {
-                'Fresher (0-2 years)': 'FR', 'Mid-Level (2-5 years)': 'ML',
-                'Senior (5-8 years)': 'SR', 'Experienced (8+ years)': 'EX'
-            }.get(experience_level, 'UK')
-            
-            quality_score = analysis.get('resume_score', 0)
-            quality_indicator = 'H' if quality_score >= 0.7 else 'M' if quality_score >= 0.4 else 'L'
-            
-            new_filename = f"[{domain_abbrev}_{exp_abbrev}_{experience_years}Y_Q{quality_indicator}] {timestamp}_{clean_filename}.{file_extension}"
-            
-            # Build enhanced description
-            description_parts = [
-                f"VLSI Resume Scanner Analysis v2.1",
-                f"",
-                f"Email: {metadata.get('sender', 'Unknown')}",
-                f"Subject: {metadata.get('subject', 'No subject')}",
-                f"Date: {metadata.get('date', 'Unknown')}",
-                f"",
-                f"=== CLASSIFICATION ===",
-                f"Domain: {domain} (confidence: {enhanced.get('domain_confidence', 0):.2f})",
-                f"Experience: {experience_level} ({experience_years} years)",
-                f"Quality Score: {quality_score:.2f}"
-            ]
-            
-            # Add other matching domains
-            if enhanced.get('all_domains') and len(enhanced['all_domains']) > 1:
-                description_parts.extend([
-                    f"",
-                    f"=== OTHER DOMAINS ===",
-                ])
-                for domain_info in enhanced['all_domains'][1:3]:
-                    description_parts.append(
-                        f"{domain_info['domain']}: score {domain_info['score']}"
-                    )
-            
-            description_parts.extend([
-                f"",
-                f"Auto-filed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                f"Location: {domain} > {experience_level}"
-            ])
-            
-            file_metadata = {
-                'name': new_filename,
-                'parents': [target_folder_id],
-                'description': '\n'.join(description_parts)
-            }
-            
-            # Upload file
-            mime_types = {
-                'pdf': 'application/pdf',
-                'doc': 'application/msword',
-                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            }
-            mime_type = mime_types.get(file_extension, 'application/octet-stream')
-            
-            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
-                temp_file.write(file_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                from googleapiclient.http import MediaFileUpload
-                media = MediaFileUpload(temp_file_path, mimetype=mime_type)
-                file = self.drive_service.files().create(
-                    body=file_metadata,
-                    media_body=media,
-                    fields='id'
-                ).execute()
-                
-                file_id = file.get('id')
-                self.add_log(
-                    f"💾 Saved: {domain}/{experience_level} - {filename} "
-                    f"(Quality: {quality_score:.2f})",
-                    'success'
-                )
-                return file_id
-                
-            finally:
-                os.unlink(temp_file_path)
-            
-        except Exception as e:
-            self.add_log(f"❌ Save failed for {filename}: {e}", 'error')
-            return None
-
-    def get_system_status(self) -> Dict[str, Any]:
-        """Get current system status"""
-        return {
-            'google_apis_available': GOOGLE_APIS_AVAILABLE,
-            'pdf_processing_available': PDF_PROCESSING_AVAILABLE,
-            'docx_processing_available': DOCX_PROCESSING_AVAILABLE,
-            'doc_processing_available': DOC_PROCESSING_AVAILABLE,
-            'credentials_file_exists': os.path.exists('credentials.json'),
-            'token_file_exists': os.path.exists('token.json'),
-            'gmail_service_active': self.gmail_service is not None,
-            'drive_service_active': self.drive_service is not None,
-            'env_client_id': bool(os.environ.get('GOOGLE_CLIENT_ID')),
-            'env_client_secret': bool(os.environ.get('GOOGLE_CLIENT_SECRET')),
-            'env_project_id': bool(os.environ.get('GOOGLE_PROJECT_ID')),
-            'current_user': self.current_user_email,
-            'authenticated_users': list(self.user_credentials.keys()),
-            'stats': self.stats,
-            'recent_logs': self.logs[-10:] if self.logs else []
-        }
-
-    def get_classification_report(self) -> Dict[str, Any]:
-        """Generate classification statistics report"""
-        stats = self.classification_stats
-        
-        # Calculate accuracy
-        total = stats['total_analyzed']
-        if total > 0:
-            accuracy = (total - stats['false_positives']) / total
-        else:
-            accuracy = 0
-        
-        # Sort domains by count
-        sorted_domains = sorted(
-            stats['domains'].items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
-        
-        return {
-            'total_analyzed': total,
-            'accuracy': round(accuracy * 100, 2),
-            'false_positives': stats['false_positives'],
-            'domain_distribution': sorted_domains,
-            'top_domain': sorted_domains[0][0] if sorted_domains else 'None',
-            'report_generated': datetime.now().isoformat()
-        }
-
-# Initialize scanner
-scanner = VLSIResumeScanner()
-
-def admin_required(f):
-    """Decorator to require admin authentication"""
-    def wrapper(*args, **kwargs):
-        if not session.get('admin_authenticated'):
-            return jsonify({'error': 'Admin authentication required'}), 401
-        return f(*args, **kwargs)
-    wrapper.__name__ = f.__name__
-    return wrapper
-
-@app.route('/')
-def index():
-    """Main dashboard"""
-    template = '''
+# HTML Templates
+def get_base_html():
+    return '''
     <!DOCTYPE html>
-    <html lang="en">
+    <html>
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>VLSI Resume Scanner</title>
+        <title>VT - Physical Design Interview System</title>
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
+            
             body { 
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                min-height: 100vh; padding: 20px; color: #333;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: #0a0a0a;
+                color: #e0e0e0;
+                line-height: 1.6;
             }
+            
+            /* Header Styles */
+            .header { 
+                background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+                color: white; 
+                padding: 20px 0;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                border-bottom: 2px solid #2196F3;
+            }
+            
+            .header-content { 
+                max-width: 1200px; 
+                margin: 0 auto;
+                padding: 0 20px;
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center; 
+            }
+            
+            .logo-section {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .logo {
+                width: 50px;
+                height: 50px;
+                background: linear-gradient(135deg, #2196F3 0%, #64B5F6 100%);
+                clip-path: polygon(0 0, 100% 0, 50% 100%);
+                position: relative;
+            }
+            
+            .logo::after {
+                content: 'VT';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-weight: bold;
+                font-size: 18px;
+                color: white;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            }
+            
+            .header h1 { 
+                font-size: 1.8rem;
+                font-weight: 300;
+                letter-spacing: 1px;
+            }
+            
+            .user-info { 
+                display: flex; 
+                align-items: center; 
+                gap: 20px; 
+            }
+            
+            .logout-btn { 
+                background: rgba(255,255,255,0.1);
+                backdrop-filter: blur(10px);
+                color: white; 
+                text-decoration: none; 
+                padding: 10px 20px; 
+                border-radius: 25px;
+                border: 1px solid rgba(255,255,255,0.2);
+                transition: all 0.3s ease;
+                font-weight: 500;
+            }
+            
+            .logout-btn:hover { 
+                background: rgba(255,255,255,0.2);
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            }
+            
+            /* Container */
             .container { 
-                max-width: 1200px; margin: 0 auto; 
-                background: white; border-radius: 15px; 
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1); 
-                overflow: hidden; 
+                max-width: 1200px; 
+                margin: 2rem auto; 
+                padding: 0 2rem; 
             }
-            .header {
-                background: linear-gradient(135deg, #4a90e2 0%, #7b68ee 100%);
-                color: white; padding: 30px; text-align: center;
+            
+            /* Cards */
+            .card { 
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                padding: 2rem; 
+                margin: 2rem 0; 
+                border-radius: 15px; 
+                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                border: 1px solid rgba(255,255,255,0.1);
+                backdrop-filter: blur(10px);
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
             }
-            .header h1 { font-size: 2.5em; margin-bottom: 10px; }
-            .header p { font-size: 1.1em; opacity: 0.9; }
-            .content { padding: 30px; }
-            .auth-section {
-                background: #f8f9fa; border-radius: 10px; 
-                padding: 20px; margin-bottom: 30px; text-align: center;
+            
+            .card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 12px 40px rgba(33,150,243,0.2);
             }
-            .controls { 
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 15px; margin-bottom: 30px; 
+            
+            /* Stats Grid */
+            .stats { 
+                display: grid; 
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 2rem; 
+                margin-bottom: 3rem;
             }
-            .controls button {
-                padding: 15px 20px; border: none; border-radius: 8px;
-                font-size: 1em; font-weight: bold; cursor: pointer;
-                transition: all 0.3s ease; color: white;
+            
+            .stat-card { 
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                text-align: center;
+                padding: 2rem;
+                border-radius: 15px;
+                border: 1px solid rgba(255,255,255,0.1);
+                transition: all 0.3s ease;
             }
-            .controls button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-            .controls button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-            .status-grid {
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 20px; margin-bottom: 30px;
+            
+            .stat-card:hover {
+                transform: translateY(-10px) scale(1.02);
+                box-shadow: 0 15px 35px rgba(33,150,243,0.3);
             }
-            .status-card {
-                background: #f8f9fa; border-radius: 10px; padding: 20px;
-                border-left: 4px solid #4a90e2;
+            
+            .stat-value { 
+                font-size: 3rem; 
+                font-weight: bold; 
+                color: #64B5F6;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                margin-bottom: 0.5rem;
             }
-            .status-card h3 { color: #4a90e2; margin-bottom: 15px; }
-            .status-item { 
-                display: flex; justify-content: space-between; 
-                margin-bottom: 8px; padding: 5px 0;
+            
+            .stat-label { 
+                color: #B0BEC5;
+                font-size: 1rem; 
+                text-transform: uppercase; 
+                letter-spacing: 2px;
+                font-weight: 300;
             }
-            .status-value.success { color: #28a745; font-weight: bold; }
-            .status-value.error { color: #dc3545; font-weight: bold; }
-            .status-value.warning { color: #ffc107; font-weight: bold; }
-            .logs-section {
-                background: #1e1e1e; border-radius: 10px; padding: 20px;
-                max-height: 400px; overflow-y: auto;
+            
+            /* Forms */
+            .form-group { 
+                margin: 1.5rem 0; 
             }
-            .log-entry {
-                margin-bottom: 8px; font-family: 'Consolas', monospace; 
-                font-size: 0.9em; padding: 5px; border-radius: 3px;
+            
+            label { 
+                display: block; 
+                margin-bottom: 0.5rem; 
+                font-weight: 500; 
+                color: #64B5F6;
+                font-size: 0.9rem;
+                text-transform: uppercase;
+                letter-spacing: 1px;
             }
-            .log-entry.info { color: #61dafb; }
-            .log-entry.success { color: #4ade80; }
-            .log-entry.warning { color: #fbbf24; }
-            .log-entry.error { color: #f87171; }
-            .input-group {
-                display: flex; gap: 10px; margin-bottom: 20px;
+            
+            input, select, textarea { 
+                width: 100%; 
+                padding: 12px 16px; 
+                border: 2px solid rgba(255,255,255,0.1);
+                background: rgba(255,255,255,0.05);
+                border-radius: 8px;
+                color: #e0e0e0;
+                font-size: 1rem;
+                transition: all 0.3s ease;
             }
-            .input-group input {
-                flex: 1; padding: 10px; border: 1px solid #ddd;
-                border-radius: 5px; font-size: 1em;
+            
+            input:focus, select:focus, textarea:focus { 
+                outline: none; 
+                border-color: #2196F3;
+                background: rgba(255,255,255,0.08);
+                box-shadow: 0 0 20px rgba(33,150,243,0.2);
             }
-            .input-group button {
-                padding: 10px 20px; background: #4a90e2; color: white;
-                border: none; border-radius: 5px; cursor: pointer;
+            
+            textarea { 
+                min-height: 120px; 
+                resize: vertical; 
+                font-family: inherit;
             }
-            .stats-overview {
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 15px; margin-bottom: 20px;
+            
+            /* Buttons */
+            button, .btn { 
+                background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+                color: white; 
+                padding: 12px 30px; 
+                border: none; 
+                border-radius: 25px; 
+                font-size: 1rem; 
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(33,150,243,0.3);
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                display: inline-block;
+                text-decoration: none;
             }
-            .stat-card {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white; padding: 20px; border-radius: 10px; text-align: center;
+            
+            button:hover, .btn:hover { 
+                transform: translateY(-2px);
+                box-shadow: 0 6px 25px rgba(33,150,243,0.4);
+                background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
             }
-            .stat-number { font-size: 2em; font-weight: bold; margin-bottom: 5px; }
-            .stat-label { font-size: 0.9em; opacity: 0.9; }
+            
+            /* Tables */
+            table { 
+                width: 100%; 
+                border-collapse: collapse;
+                margin-top: 1rem;
+                background: rgba(255,255,255,0.02);
+                border-radius: 10px;
+                overflow: hidden;
+            }
+            
+            th, td { 
+                padding: 15px; 
+                text-align: left; 
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+            }
+            
+            th { 
+                background: rgba(33,150,243,0.1);
+                font-weight: 600; 
+                color: #64B5F6;
+                text-transform: uppercase;
+                font-size: 0.85rem;
+                letter-spacing: 1px;
+            }
+            
+            tr:hover {
+                background: rgba(255,255,255,0.03);
+            }
+            
+            /* Questions */
+            .question { 
+                background: linear-gradient(135deg, rgba(33,150,243,0.1) 0%, rgba(33,150,243,0.05) 100%);
+                padding: 1.5rem; 
+                margin: 1.5rem 0; 
+                border-left: 4px solid #2196F3;
+                border-radius: 8px;
+                transition: all 0.3s ease;
+            }
+            
+            .question:hover {
+                transform: translateX(5px);
+                box-shadow: 0 5px 20px rgba(33,150,243,0.2);
+            }
+            
+            .question-number { 
+                font-weight: 600; 
+                color: #64B5F6;
+                margin-bottom: 0.5rem;
+                font-size: 1.1rem;
+            }
+            
+            .answer-box { 
+                margin-top: 1rem;
+                background: rgba(0,0,0,0.3);
+                padding: 1rem;
+                border-radius: 8px;
+                border: 1px solid rgba(255,255,255,0.05);
+            }
+            
+            /* Badges */
+            .badge { 
+                display: inline-block; 
+                padding: 6px 16px; 
+                border-radius: 20px; 
+                font-size: 0.85rem;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            
+            .badge-pending { 
+                background: linear-gradient(135deg, #FFC107 0%, #FFB300 100%);
+                color: #000;
+            }
+            
+            .badge-submitted { 
+                background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+                color: white;
+            }
+            
+            .badge-under_review { 
+                background: linear-gradient(135deg, #FF5722 0%, #E64A19 100%);
+                color: white;
+            }
+            
+            .badge-published { 
+                background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+                color: white;
+            }
+            
+            /* Messages */
+            .error { 
+                color: #FF5252;
+                background: rgba(255,82,82,0.1);
+                padding: 1rem;
+                border-radius: 8px;
+                border: 1px solid rgba(255,82,82,0.3);
+                margin: 1rem 0;
+            }
+            
+            .success { 
+                color: #69F0AE;
+                background: rgba(105,240,174,0.1);
+                padding: 1rem;
+                border-radius: 8px;
+                border: 1px solid rgba(105,240,174,0.3);
+                margin: 1rem 0;
+            }
+            
+            /* Score Box */
+            .score-box { 
+                display: flex; 
+                align-items: center; 
+                gap: 20px; 
+                margin: 1rem 0;
+                flex-wrap: wrap;
+            }
+            
+            .auto-score { 
+                background: linear-gradient(135deg, rgba(33,150,243,0.2) 0%, rgba(33,150,243,0.1) 100%);
+                padding: 8px 16px; 
+                border-radius: 20px;
+                font-weight: 500;
+                border: 1px solid rgba(33,150,243,0.3);
+            }
+            
+            .rubric { 
+                background: rgba(255,255,255,0.03);
+                padding: 1rem; 
+                margin: 1rem 0; 
+                border-radius: 8px; 
+                font-size: 0.9rem;
+                border: 1px solid rgba(255,255,255,0.05);
+            }
+            
+            /* Login Page */
+            .login-container { 
+                min-height: 100vh; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0f3460 100%);
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .login-container::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: radial-gradient(circle, rgba(33,150,243,0.1) 0%, transparent 70%);
+                animation: pulse 10s ease-in-out infinite;
+            }
+            
+            @keyframes pulse {
+                0%, 100% { transform: scale(1); opacity: 0.5; }
+                50% { transform: scale(1.1); opacity: 0.3; }
+            }
+            
+            .login-box { 
+                background: rgba(26,26,46,0.9);
+                backdrop-filter: blur(20px);
+                padding: 3rem; 
+                border-radius: 20px; 
+                box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+                width: 100%; 
+                max-width: 450px;
+                border: 1px solid rgba(255,255,255,0.1);
+                position: relative;
+                z-index: 1;
+            }
+            
+            .login-logo {
+                text-align: center;
+                margin-bottom: 2rem;
+            }
+            
+            .login-logo .logo {
+                width: 80px;
+                height: 80px;
+                margin: 0 auto;
+                font-size: 24px;
+            }
+            
+            .login-title {
+                text-align: center;
+                margin-bottom: 2rem;
+                color: #e0e0e0;
+                font-weight: 300;
+                font-size: 1.8rem;
+            }
+            
+            .info-box {
+                background: rgba(33,150,243,0.1);
+                border: 1px solid rgba(33,150,243,0.3);
+                padding: 1rem;
+                border-radius: 10px;
+                margin-bottom: 1.5rem;
+                font-size: 0.9rem;
+            }
+            
+            /* Animations */
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            
+            .card, .stat-card {
+                animation: fadeIn 0.6s ease-out;
+            }
+            
+            /* Responsive */
+            @media (max-width: 768px) {
+                .header h1 { font-size: 1.2rem; }
+                .stats { grid-template-columns: 1fr; }
+                .container { padding: 0 1rem; }
+                .stat-value { font-size: 2rem; }
+            }
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header">
-                <h1>🔬 VLSI Resume Scanner v2.1</h1>
-                <p>AI-Powered Domain & Experience Classification System</p>
-            </div>
+    '''
+
+# Routes
+@app.route('/')
+def home():
+    if 'user_id' in session:
+        if session.get('is_admin'):
+            return redirect('/admin')
+        else:
+            return redirect('/student')
+    return redirect('/login')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        user = users.get(username)
+        if user and check_password_hash(user['password'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['is_admin'] = user.get('is_admin', False)
             
-            <div class="content">
-                <div id="auth-section" class="auth-section">
-                    <div class="input-group">
-                        <input type="password" id="admin-password" placeholder="Enter admin password">
-                        <button onclick="authenticate()">🔐 Login</button>
-                    </div>
-                    <p>Enter admin password to access the scanner controls</p>
+            if user.get('is_admin'):
+                return redirect('/admin')
+            else:
+                return redirect('/student')
+        else:
+            error = 'Invalid credentials'
+    
+    html = get_base_html() + f'''
+        <div class="login-container">
+            <div class="login-box">
+                <div class="login-logo">
+                    <div class="logo"></div>
                 </div>
-
-                <div id="main-content" style="display: none;">
-                    <div class="stats-overview">
-                        <div class="stat-card">
-                            <div class="stat-number" id="total-emails">-</div>
-                            <div class="stat-label">Emails Scanned</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" id="resumes-found">-</div>
-                            <div class="stat-label">Resumes Found</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" id="last-scan">Never</div>
-                            <div class="stat-label">Last Scan</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" id="errors-count">-</div>
-                            <div class="stat-label">Processing Errors</div>
-                        </div>
-                    </div>
-
-                    <div class="controls">
-                        <button onclick="setupGmail()" style="background: #17a2b8;">🔧 Setup Gmail Integration</button>
-                        <button onclick="scanGmail()" style="background: #007bff;">📧 Full Gmail Scan</button>
-                        <button onclick="quickScan()" style="background: #28a745;">⚡ Quick Scan (Last 50)</button>
-                        <button onclick="testSystem()" style="background: #6c757d;">🔍 Test System</button>
-                        <button onclick="showClassificationReport()" style="background: #9c27b0;">📊 Classification Report</button>
-                        <button onclick="showUserManager()" style="background: #fd7e14;">👥 Manage Team Access</button>
-                    </div>
-
-                    <div id="classification-report" style="display: none; background: #f3e5f5; border: 1px solid #9c27b0; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                        <h3 style="color: #7b1fa2;">📊 Classification Analytics</h3>
-                        <div id="report-content">Loading...</div>
-                        <button onclick="hideClassificationReport()" style="margin-top: 10px; padding: 8px 16px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Close
-                        </button>
-                    </div>
-
-                    <div id="user-manager" style="display: none; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                        <h3 style="color: #1976d2; margin: 0 0 15px 0;">👥 Team Member Authentication</h3>
-                        <p style="color: #1976d2; margin: 0 0 15px 0;">
-                            Team members can authenticate with their own Gmail accounts for personalized access.
-                        </p>
-                        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
-                            <input type="email" id="user-email-input" placeholder="team-member@gmail.com" 
-                                   style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-                            <button onclick="authenticateUser()" style="padding: 10px 20px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                Add Team Member
-                            </button>
-                        </div>
-                        <div id="authenticated-users" style="background: white; border-radius: 4px; padding: 10px;">
-                            <strong>Authenticated Users:</strong>
-                            <div id="user-list">Loading...</div>
-                        </div>
-                        <button onclick="hideUserManager()" style="margin-top: 10px; padding: 8px 16px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Close
-                        </button>
-                    </div>
-
-                    <div id="oauth-input" style="display: none; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                        <h3 style="color: #856404; margin: 0 0 15px 0;">🔑 OAuth Authorization Required</h3>
-                        <p style="color: #856404; margin: 0 0 15px 0;">
-                            Click the authorization URL in the logs above, complete Google authorization, then enter the code you receive:
-                        </p>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="text" id="oauth-code-input" placeholder="4/1AUJR-x7uuwO5w4uilFkKhvWFzrd99..." 
-                                   style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;">
-                            <button onclick="submitOAuthCode()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                Submit Code
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="status-grid">
-                        <div class="status-card">
-                            <h3>🔧 System Status</h3>
-                            <div id="system-status">Loading...</div>
-                        </div>
-                        
-                        <div class="status-card">
-                            <h3>🔑 Authentication</h3>
-                            <div id="auth-status">Loading...</div>
-                        </div>
-                        
-                        <div class="status-card">
-                            <h3>📊 Statistics</h3>
-                            <div id="stats-details">Loading...</div>
-                        </div>
-                    </div>
-
-                    <div class="status-card">
-                        <h3>📋 Activity Logs</h3>
-                        <div class="logs-section" id="logs-container">
-                            <div class="log-entry info">System initialized. Waiting for commands...</div>
-                        </div>
-                    </div>
+                <h1 class="login-title">Physical Design Interview System</h1>
+                <p style="text-align: center; color: #64B5F6; margin-bottom: 2rem;">3+ Years Experience Assessment</p>
+                <div class="info-box">
+                    <strong style="color: #64B5F6;">Demo Credentials:</strong><br>
+                    Admin: admin / Vibhuaya@3006<br>
+                    Student: eng001-eng005 / password123
                 </div>
+                {f'<p class="error">{error}</p>' if error else ''}
+                <form method="POST">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" name="username" required placeholder="Enter your username">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" name="password" required placeholder="Enter your password">
+                    </div>
+                    <button type="submit" style="width: 100%; margin-top: 1rem;">LOGIN</button>
+                </form>
             </div>
         </div>
-
-        <script>
-        let isAdmin = false;
-        let logCount = 0;
-
-        function authenticate() {
-            const password = document.getElementById('admin-password').value;
-            
-            fetch('/api/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: password })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    isAdmin = true;
-                    document.getElementById('auth-section').style.display = 'none';
-                    document.getElementById('main-content').style.display = 'block';
-                    loadSystemStatus();
-                    startLogPolling();
-                } else {
-                    alert('Invalid password');
-                }
-            });
-        }
-
-        function setupGmail() {
-            if (!isAdmin) return;
-            addLogToDisplay('🔧 Starting Gmail API setup...', 'info');
-            
-            fetch('/api/setup-gmail', { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        addLogToDisplay('✅ ' + data.message, 'success');
-                        hideOAuthInput();
-                    } else {
-                        addLogToDisplay('❌ ' + data.message, 'error');
-                        if (data.message.includes('authentication failed')) {
-                            setTimeout(showOAuthInput, 1000);
-                        }
-                    }
-                })
-                .catch(e => {
-                    addLogToDisplay('❌ Setup failed: ' + e.message, 'error');
-                });
-        }
-
-        function showOAuthInput() {
-            document.getElementById('oauth-input').style.display = 'block';
-        }
-
-        function hideOAuthInput() {
-            document.getElementById('oauth-input').style.display = 'none';
-            document.getElementById('oauth-code-input').value = '';
-        }
-
-        function submitOAuthCode() {
-            const code = document.getElementById('oauth-code-input').value.trim();
-            
-            if (!code) {
-                addLogToDisplay('❌ Please enter the authorization code', 'error');
-                return;
-            }
-            
-            addLogToDisplay('🔄 Submitting authorization code...', 'info');
-            
-            fetch('/api/oauth-code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: code })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    addLogToDisplay('✅ ' + data.message, 'success');
-                    hideOAuthInput();
-                } else {
-                    addLogToDisplay('❌ ' + data.message, 'error');
-                }
-            })
-            .catch(e => {
-                addLogToDisplay('❌ Code submission failed: ' + e.message, 'error');
-            });
-        }
-
-        function showUserManager() {
-            document.getElementById('user-manager').style.display = 'block';
-            loadAuthenticatedUsers();
-        }
-
-        function hideUserManager() {
-            document.getElementById('user-manager').style.display = 'none';
-        }
-
-        function authenticateUser() {
-            const email = document.getElementById('user-email-input').value.trim();
-            
-            if (!email || !email.includes('@')) {
-                addLogToDisplay('❌ Please enter a valid email address', 'error');
-                return;
-            }
-            
-            addLogToDisplay(`🔐 Starting authentication for ${email}...`, 'info');
-            
-            fetch('/api/setup-gmail', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_email: email })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    addLogToDisplay('✅ ' + data.message, 'success');
-                    hideOAuthInput();
-                    hideUserManager();
-                } else {
-                    addLogToDisplay('❌ ' + data.message, 'error');
-                    if (data.message.includes('authentication failed')) {
-                        setTimeout(showOAuthInput, 1000);
-                    }
-                }
-            })
-            .catch(e => {
-                addLogToDisplay('❌ Authentication failed: ' + e.message, 'error');
-            });
-        }
-
-        function loadAuthenticatedUsers() {
-            fetch('/api/users')
-            .then(r => r.json())
-            .then(data => {
-                const userList = document.getElementById('user-list');
-                if (data.users && data.users.length > 0) {
-                    userList.innerHTML = data.users.map(user => 
-                        `<div style="padding: 5px 0; border-bottom: 1px solid #eee;">
-                            <span style="color: #2196f3;">✓</span> ${user}
-                        </div>`
-                    ).join('');
-                } else {
-                    userList.innerHTML = '<div style="color: #666; font-style: italic;">No authenticated users yet</div>';
-                }
-            })
-            .catch(e => {
-                document.getElementById('user-list').innerHTML = '<div style="color: #f44336;">Error loading users</div>';
-            });
-        }
-
-        function scanGmail() {
-            if (!isAdmin) return;
-            addLogToDisplay('📧 Starting full Gmail scan...', 'info');
-            
-            fetch('/api/scan-gmail', { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        addLogToDisplay(`✅ Scan completed: ${data.processed} emails processed, ${data.resumes_found} resumes found`, 'success');
-                        updateStats(data.stats);
-                    } else {
-                        addLogToDisplay('❌ ' + data.error, 'error');
-                    }
-                })
-                .catch(e => {
-                    addLogToDisplay('❌ Scan failed: ' + e.message, 'error');
-                });
-        }
-
-        function quickScan() {
-            if (!isAdmin) return;
-            addLogToDisplay('⚡ Starting quick scan (last 50 emails)...', 'info');
-            
-            fetch('/api/quick-scan', { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        addLogToDisplay(`✅ Quick scan completed: ${data.processed} emails processed, ${data.resumes_found} resumes found`, 'success');
-                        updateStats(data.stats);
-                    } else {
-                        addLogToDisplay('❌ ' + data.error, 'error');
-                    }
-                })
-                .catch(e => {
-                    addLogToDisplay('❌ Quick scan failed: ' + e.message, 'error');
-                });
-        }
-
-        function testSystem() {
-            if (!isAdmin) return;
-            addLogToDisplay('🔍 Running system test...', 'info');
-            
-            fetch('/api/test-system', { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    addLogToDisplay('📊 System test completed', 'info');
-                    loadSystemStatus();
-                })
-                .catch(e => {
-                    addLogToDisplay('❌ System test failed: ' + e.message, 'error');
-                });
-        }
-
-        function showClassificationReport() {
-            document.getElementById('classification-report').style.display = 'block';
-            
-            fetch('/api/classification-report')
-                .then(r => r.json())
-                .then(data => {
-                    let html = `
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                            <div style="background: white; padding: 15px; border-radius: 5px;">
-                                <div style="font-size: 2em; font-weight: bold; color: #7b1fa2;">${data.total_analyzed}</div>
-                                <div style="color: #666;">Total Analyzed</div>
-                            </div>
-                            <div style="background: white; padding: 15px; border-radius: 5px;">
-                                <div style="font-size: 2em; font-weight: bold; color: #4caf50;">${data.accuracy}%</div>
-                                <div style="color: #666;">Accuracy</div>
-                            </div>
-                            <div style="background: white; padding: 15px; border-radius: 5px;">
-                                <div style="font-size: 2em; font-weight: bold; color: #f44336;">${data.false_positives}</div>
-                                <div style="color: #666;">False Positives</div>
-                            </div>
-                        </div>
-                        
-                        <h4>Domain Distribution:</h4>
-                        <div style="background: white; padding: 15px; border-radius: 5px;">
-                    `;
-                    
-                    if (data.domain_distribution && data.domain_distribution.length > 0) {
-                        data.domain_distribution.forEach(([domain, count]) => {
-                            const percentage = ((count / data.total_analyzed) * 100).toFixed(1);
-                            html += `
-                                <div style="margin-bottom: 10px;">
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span>${domain}</span>
-                                        <span>${count} (${percentage}%)</span>
-                                    </div>
-                                    <div style="background: #e0e0e0; height: 20px; border-radius: 10px; overflow: hidden;">
-                                        <div style="background: #7b1fa2; width: ${percentage}%; height: 100%;"></div>
-                                    </div>
-                                </div>
-                            `;
-                        });
-                    } else {
-                        html += '<p style="color: #666;">No domain data available yet</p>';
-                    }
-                    
-                    html += '</div>';
-                    document.getElementById('report-content').innerHTML = html;
-                })
-                .catch(e => {
-                    document.getElementById('report-content').innerHTML = 
-                        '<div style="color: #f44336;">Error loading report</div>';
-                });
-        }
-
-        function hideClassificationReport() {
-            document.getElementById('classification-report').style.display = 'none';
-        }
-
-        function loadSystemStatus() {
-            if (!isAdmin) return;
-            
-            fetch('/api/status')
-                .then(r => r.json())
-                .then(data => {
-                    updateSystemStatus(data);
-                    updateStats(data.stats);
-                })
-                .catch(e => {
-                    console.error('Failed to load status:', e);
-                });
-        }
-
-        function updateSystemStatus(data) {
-            const systemStatus = document.getElementById('system-status');
-            const authStatus = document.getElementById('auth-status');
-            
-            systemStatus.innerHTML = `
-                <div class="status-item">
-                    <span>Google APIs:</span>
-                    <span class="status-value ${data.google_apis_available ? 'success' : 'error'}">
-                        ${data.google_apis_available ? '✅ Available' : '❌ Missing'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>PDF Processing:</span>
-                    <span class="status-value ${data.pdf_processing_available ? 'success' : 'error'}">
-                        ${data.pdf_processing_available ? '✅ Available' : '❌ Missing'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>DOC Processing:</span>
-                    <span class="status-value ${data.docx_processing_available || data.doc_processing_available ? 'success' : 'error'}">
-                        ${data.docx_processing_available || data.doc_processing_available ? '✅ Available' : '❌ Missing'}
-                    </span>
-                </div>
-            `;
-            
-            authStatus.innerHTML = `
-                <div class="status-item">
-                    <span>Gmail Service:</span>
-                    <span class="status-value ${data.gmail_service_active ? 'success' : 'error'}">
-                        ${data.gmail_service_active ? '✅ Active' : '❌ Inactive'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>Drive Service:</span>
-                    <span class="status-value ${data.drive_service_active ? 'success' : 'error'}">
-                        ${data.drive_service_active ? '✅ Active' : '❌ Inactive'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>Current User:</span>
-                    <span class="status-value ${data.current_user ? 'success' : 'warning'}">
-                        ${data.current_user || 'Not authenticated'}
-                    </span>
-                </div>
-            `;
-        }
-
-        function updateStats(stats) {
-            if (stats) {
-                document.getElementById('total-emails').textContent = stats.total_emails || 0;
-                document.getElementById('resumes-found').textContent = stats.resumes_found || 0;
-                document.getElementById('errors-count').textContent = stats.processing_errors || 0;
-                
-                if (stats.last_scan_time) {
-                    const lastScan = new Date(stats.last_scan_time).toLocaleString();
-                    document.getElementById('last-scan').textContent = lastScan;
-                }
-            }
-        }
-
-        function addLogToDisplay(message, level = 'info') {
-            const logsContainer = document.getElementById('logs-container');
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = document.createElement('div');
-            logEntry.className = `log-entry ${level}`;
-            logEntry.textContent = `[${timestamp}] ${message}`;
-            
-            logsContainer.appendChild(logEntry);
-            logsContainer.scrollTop = logsContainer.scrollHeight;
-            
-            while (logsContainer.children.length > 100) {
-                logsContainer.removeChild(logsContainer.firstChild);
-            }
-        }
-
-        function startLogPolling() {
-            setInterval(() => {
-                if (isAdmin) {
-                    fetch('/api/logs')
-                        .then(r => r.json())
-                        .then(logs => {
-                            const logsContainer = document.getElementById('logs-container');
-                            
-                            const newLogs = logs.slice(logCount);
-                            newLogs.forEach(log => {
-                                const logEntry = document.createElement('div');
-                                logEntry.className = `log-entry ${log.level}`;
-                                logEntry.textContent = `[${log.timestamp}] ${log.message}`;
-                                logsContainer.appendChild(logEntry);
-                            });
-                            
-                            logCount = logs.length;
-                            logsContainer.scrollTop = logsContainer.scrollHeight;
-                            
-                            while (logsContainer.children.length > 100) {
-                                logsContainer.removeChild(logsContainer.firstChild);
-                            }
-                        })
-                        .catch(e => console.error('Log polling failed:', e));
-                }
-            }, 2000);
-        }
-
-        // Enter key support for password field
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('admin-password').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    authenticate();
-                }
-            });
-        });
-        </script>
     </body>
     </html>
     '''
-    return render_template_string(template)
+    return html
 
-@app.route('/api/auth', methods=['POST'])
-def api_auth():
-    """Admin authentication"""
-    data = request.get_json()
-    password = data.get('password', '')
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
+
+@app.route('/admin')
+def admin_dashboard():
+    if 'user_id' not in session or not session.get('is_admin'):
+        return redirect('/login')
     
-    if password == ADMIN_PASSWORD:
-        session['admin_authenticated'] = True
-        return jsonify({'success': True})
+    engineers = [u for u in users.values() if not u.get('is_admin')]
+    all_assignments = list(assignments.values())
+    
+    # Count assignments by status
+    submitted = [a for a in all_assignments if a['status'] == 'submitted']
+    under_review = [a for a in all_assignments if a['status'] == 'under_review']
+    published = [a for a in all_assignments if a['status'] == 'published']
+    
+    html = get_base_html() + f'''
+        <div class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo"></div>
+                    <h1>Admin Dashboard</h1>
+                </div>
+                <div class="user-info">
+                    <span style="color: #64B5F6;">Welcome, {session["username"]}</span>
+                    <a href="/logout" class="logout-btn">LOGOUT</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="container">
+            <div class="stats">
+                <div class="stat card">
+                    <h2>{len(engineers)}</h2>
+                    <p>Engineers</p>
+                </div>
+                <div class="stat card">
+                    <h2>{len(submitted)}</h2>
+                    <p>Submitted</p>
+                </div>
+                <div class="stat card">
+                    <h2>{len(under_review)}</h2>
+                    <p>Under Review</p>
+                </div>
+                <div class="stat card">
+                    <h2>{len(published)}</h2>
+                    <p>Published</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Create Assignment</h2>
+                <form method="POST" action="/admin/create">
+                    <div class="form-group">
+                        <label>Engineer</label>
+                        <select name="engineer_id" required>
+                            <option value="">Select...</option>
+    '''
+    
+    for eng in engineers:
+        html += f'<option value="{eng["id"]}">{eng["username"]}</option>'
+    
+    html += '''
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Topic</label>
+                        <select name="topic" required>
+                            <option value="">Select...</option>
+                            <option value="floorplanning">Floorplanning</option>
+                            <option value="placement">Placement</option>
+                            <option value="routing">Routing</option>
+                        </select>
+                    </div>
+                    <button type="submit">Create Assignment</button>
+                </form>
+            </div>
+            
+            <div class="card">
+                <h2>Submitted Assignments (Ready for Review)</h2>
+    '''
+    
+    if submitted:
+        for a in submitted:
+            html += f'''
+                <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0;">
+                    <h4>{a["id"]} - {a["engineer_id"]} - {a["topic"].title()}</h4>
+                    <p>Submitted: All 15 answers | Auto-score calculated</p>
+                    <a href="/admin/review/{a["id"]}"><button>Review & Score</button></a>
+                </div>
+            '''
     else:
-        return jsonify({'success': False})
+        html += '<p>No assignments ready for review</p>'
+    
+    html += '''
+            </div>
+            
+            <div class="card">
+                <h2>All Assignments</h2>
+                <table>
+                    <tr>
+                        <th>ID</th>
+                        <th>Engineer</th>
+                        <th>Topic</th>
+                        <th>Status</th>
+                        <th>Score</th>
+                        <th>Action</th>
+                    </tr>
+    '''
+    
+    for a in all_assignments[-10:]:  # Last 10
+        action = ""
+        if a['status'] == 'under_review':
+            action = f'<a href="/admin/publish/{a["id"]}"><button>Publish</button></a>'
+        elif a['status'] == 'published':
+            action = "Published ✓"
+            
+        html += f'''
+            <tr>
+                <td>{a["id"]}</td>
+                <td>{a["engineer_id"]}</td>
+                <td>{a["topic"]}</td>
+                <td><span class="badge badge-{a["status"]}">{a["status"]}</span></td>
+                <td>{a.get("total_score", "-")}/150</td>
+                <td>{action}</td>
+            </tr>
+        '''
+    
+    html += '''
+                </table>
+            </div>
+        </div>
+    </body>
+    </html>
+    '''
+    return html
 
-@app.route('/api/setup-gmail', methods=['POST'])
-@admin_required
-def api_setup_gmail():
-    """Setup Gmail API authentication"""
-    try:
-        data = request.get_json() or {}
-        user_email = data.get('user_email')
-        
-        if not GOOGLE_APIS_AVAILABLE:
-            return jsonify({'status': 'error', 'message': 'Google API libraries not available'})
-        
-        if scanner.authenticate_google_apis(user_email):
-            if scanner.setup_drive_folders():
-                return jsonify({'status': 'success', 'message': 'Gmail integration setup completed'})
-            else:
-                return jsonify({'status': 'error', 'message': 'Drive folder setup failed'})
-        else:
-            return jsonify({'status': 'error', 'message': 'Gmail authentication failed'})
-            
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': f'Setup failed: {str(e)}'})
+@app.route('/admin/create', methods=['POST'])
+def admin_create():
+    if 'user_id' not in session or not session.get('is_admin'):
+        return redirect('/login')
+    
+    engineer_id = request.form.get('engineer_id')
+    topic = request.form.get('topic')
+    
+    if engineer_id and topic:
+        create_assignment(engineer_id, topic)
+    
+    return redirect('/admin')
 
-@app.route('/api/oauth-code', methods=['POST'])
-@admin_required
-def api_oauth_code():
-    """Submit OAuth authorization code"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'status': 'error', 'message': 'No data received'})
-            
-        auth_code = data.get('code', '').strip()
-        if not auth_code:
-            return jsonify({'status': 'error', 'message': 'Authorization code is required'})
-        
-        if not hasattr(scanner, '_oauth_flow') or not scanner._oauth_flow:
-            return jsonify({'status': 'error', 'message': 'OAuth flow not found. Please restart Gmail setup.'})
-        
-        try:
-            # Exchange code for credentials
-            scanner._oauth_flow.fetch_token(code=auth_code)
-            creds = scanner._oauth_flow.credentials
-            
-            # Save credentials
+@app.route('/admin/review/<assignment_id>', methods=['GET', 'POST'])
+def admin_review(assignment_id):
+    if 'user_id' not in session or not session.get('is_admin'):
+        return redirect('/login')
+    
+    assignment = assignments.get(assignment_id)
+    if not assignment or assignment['status'] != 'submitted':
+        return redirect('/admin')
+    
+    if request.method == 'POST':
+        # Save final scores
+        total_score = 0
+        for i in range(15):  # 15 questions
+            score = request.form.get(f'score_{i}', '0')
             try:
-                temp_gmail_service = build('gmail', 'v1', credentials=creds)
-                profile = temp_gmail_service.users().getProfile(userId='me').execute()
-                user_email = profile.get('emailAddress')
-                
-                if user_email:
-                    token_filename = f'token_{user_email.replace("@", "_").replace(".", "_")}.json'
-                    with open(token_filename, 'w') as token:
-                        token.write(creds.to_json())
-                    scanner.add_log(f"💾 Saved token for {user_email}", 'success')
-                    
-                with open('token.json', 'w') as token:
-                    token.write(creds.to_json())
-                    
-            except Exception as e:
-                scanner.add_log(f"⚠️ Could not save token: {e}", 'warning')
-            
-            # Initialize services
-            scanner.credentials = creds
-            if scanner._test_credentials():
-                if scanner.setup_drive_folders():
-                    scanner._oauth_flow = None
-                    return jsonify({'status': 'success', 'message': 'OAuth authentication completed successfully'})
-                else:
-                    return jsonify({'status': 'error', 'message': 'Drive folder setup failed'})
-            else:
-                return jsonify({'status': 'error', 'message': 'Credential verification failed'})
-            
-        except Exception as e:
-            error_str = str(e).lower()
-            if "invalid_grant" in error_str:
-                scanner.add_log("💡 Authorization code may have expired", 'warning')
-            return jsonify({'status': 'error', 'message': f'Failed to exchange code: {str(e)}'})
+                final_score = int(score)
+                assignment['final_scores'][str(i)] = final_score
+                total_score += final_score
+            except:
+                pass
         
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': f'OAuth submission failed: {str(e)}'})
+        assignment['total_score'] = total_score
+        assignment['scored_by'] = session['username']
+        assignment['scored_date'] = datetime.now().isoformat()
+        assignment['status'] = 'under_review'
+        
+        return redirect('/admin')
+    
+    # Calculate auto-scores if not done
+    if not assignment.get('auto_scores'):
+        for i, question in enumerate(assignment['questions']):
+            answer = assignment.get('answers', {}).get(str(i), '')
+            assignment['auto_scores'][str(i)] = calculate_auto_score(answer, assignment['topic'], i, assignment['engineer_id'])
+    
+    # Show review form
+    html = get_base_html() + f'''
+        <div class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo"></div>
+                    <h1>Review Assignment</h1>
+                </div>
+                <div class="user-info">
+                    <span style="color: #64B5F6;">Assignment: {assignment_id}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="container">
+            <div class="card">
+                <h3>Engineer: {assignment["engineer_id"]} | Topic: {assignment["topic"].title()}</h3>
+                
+                <div class="rubric">
+                    <strong>Scoring Rubric:</strong><br>
+    '''
+    
+    for score, desc in SCORING_RUBRIC.items():
+        html += f'{score}: {desc}<br>'
+    
+    html += '''
+                </div>
+                
+                <form method="POST">
+    '''
+    
+    for i, question in enumerate(assignment['questions']):
+        answer = assignment.get('answers', {}).get(str(i), 'No answer provided')
+        auto_score = assignment.get('auto_scores', {}).get(str(i), 0)
+        
+        html += f'''
+            <div class="question">
+                <strong>Q{i+1}:</strong> {question}
+                <div class="answer-box">
+                    <strong>Student's Answer:</strong><br>
+                    {answer}
+                </div>
+                <div class="score-box">
+                    <div class="auto-score">
+                        Auto-score (Keywords): {auto_score}/10
+                    </div>
+                    <div>
+                        <label>Final Score (0-10):</label>
+                        <input type="number" name="score_{i}" min="0" max="10" value="{auto_score}" style="width: 60px;">
+                    </div>
+                </div>
+            </div>
+        '''
+    
+    html += '''
+                    <button type="submit" style="margin-top: 20px;">Save Scores (Next: Publish)</button>
+                    <a href="/admin"><button type="button">Cancel</button></a>
+                </form>
+            </div>
+        </div>
+    </body>
+    </html>
+    '''
+    return html
 
-@app.route('/api/users')
-@admin_required
-def api_users():
-    """Get list of authenticated users"""
-    try:
-        users = list(scanner.user_credentials.keys())
-        if scanner.current_user_email and scanner.current_user_email not in users:
-            users.append(scanner.current_user_email)
-        return jsonify({'users': users})
-    except Exception as e:
-        return jsonify({'error': str(e)})
+@app.route('/admin/publish/<assignment_id>')
+def admin_publish(assignment_id):
+    if 'user_id' not in session or not session.get('is_admin'):
+        return redirect('/login')
+    
+    assignment = assignments.get(assignment_id)
+    if not assignment or assignment['status'] != 'under_review':
+        return redirect('/admin')
+    
+    # Publish the assignment
+    assignment['status'] = 'published'
+    assignment['published_date'] = datetime.now().isoformat()
+    
+    # Notify student
+    engineer_id = assignment['engineer_id']
+    if engineer_id not in notifications:
+        notifications[engineer_id] = []
+    
+    notifications[engineer_id].append({
+        'title': f'{assignment["topic"].title()} Assignment Scored',
+        'message': f'Your assignment has been evaluated. Score: {assignment["total_score"]}/150',
+        'created_at': datetime.now().isoformat()
+    })
+    
+    return redirect('/admin')
 
-@app.route('/api/scan-gmail', methods=['POST'])
-@admin_required
-def api_scan_gmail():
-    """Full Gmail scan"""
-    result = scanner.scan_emails()
-    return jsonify(result)
+@app.route('/student')
+def student_dashboard():
+    if 'user_id' not in session:
+        return redirect('/login')
+    
+    user_id = session['user_id']
+    my_assignments = [a for a in assignments.values() if a['engineer_id'] == user_id]
+    my_notifications = notifications.get(user_id, [])[-5:]
+    
+    html = get_base_html() + f'''
+        <div class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo"></div>
+                    <h1>Student Dashboard</h1>
+                </div>
+                <div class="user-info">
+                    <span style="color: #64B5F6;">{session["username"]} • 3+ Years Experience</span>
+                    <a href="/logout" class="logout-btn">LOGOUT</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="container">
+    '''
+    
+    if my_notifications:
+        html += '<div class="card"><h2>Notifications</h2>'
+        for n in my_notifications:
+            html += f'<p><strong>{n["title"]}</strong><br>{n["message"]}<br><small>{n["created_at"][:16]}</small></p>'
+        html += '</div>'
+    
+    html += '<h2>My Assignments</h2>'
+    
+    if my_assignments:
+        for a in my_assignments:
+            html += f'''
+                <div class="card">
+                    <h3>{a["topic"].title()} Assignment 
+                        <span class="badge badge-{a["status"]}">{a["status"]}</span>
+                    </h3>
+                    <p>Due: {a["due_date"][:10]}</p>
+            '''
+            
+            if a['status'] == 'published':
+                html += f'<p><strong>Score: {a["total_score"]}/150</strong> (Scored by: {a.get("scored_by", "Admin")})</p>'
+                html += f'<a href="/student/assignment/{a["id"]}"><button>View Results</button></a>'
+            elif a['status'] in ['submitted', 'under_review']:
+                html += '<p>Your submission is being reviewed...</p>'
+            else:
+                html += f'<a href="/student/assignment/{a["id"]}"><button>Answer Questions</button></a>'
+            
+            html += '</div>'
+    else:
+        html += '<div class="card"><p>No assignments yet.</p></div>'
+    
+    html += '''
+        </div>
+    </body>
+    </html>
+    '''
+    return html
 
-@app.route('/api/quick-scan', methods=['POST'])
-@admin_required
-def api_quick_scan():
-    """Quick Gmail scan"""
-    result = scanner.scan_emails(max_results=50)
-    return jsonify(result)
+@app.route('/student/assignment/<assignment_id>', methods=['GET', 'POST'])
+def student_assignment(assignment_id):
+    if 'user_id' not in session:
+        return redirect('/login')
+    
+    assignment = assignments.get(assignment_id)
+    if not assignment or assignment['engineer_id'] != session['user_id']:
+        return redirect('/student')
+    
+    if request.method == 'POST' and assignment['status'] == 'pending':
+        # Save answers
+        answers = {}
+        for i in range(15):  # 15 questions
+            answer = request.form.get(f'answer_{i}', '').strip()
+            if answer:
+                answers[str(i)] = answer
+        
+        if len(answers) == 15:  # All questions answered
+            assignment['answers'] = answers
+            assignment['status'] = 'submitted'
+            
+            # Calculate auto-scores
+            for i in range(15):
+                answer = answers.get(str(i), '')
+                assignment['auto_scores'][str(i)] = calculate_auto_score(answer, assignment['topic'], i, engineer_id)
+        
+        return redirect('/student')
+    
+    # Show assignment
+    html = get_base_html() + f'''
+        <div class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo"></div>
+                    <h1>{assignment["topic"].title()} Assignment</h1>
+                </div>
+                <div class="user-info">
+                    <span style="color: #64B5F6;">Due: {assignment["due_date"][:10]}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="container">
+            <div class="card">
+                <p>Status: <span class="badge badge-{assignment["status"]}">{assignment["status"]}</span> | Due: {assignment["due_date"][:10]}</p>
+    '''
+    
+    if assignment['status'] == 'published':
+        html += f'<p><strong>Total Score: {assignment["total_score"]}/150</strong></p>'
+    
+    if assignment['status'] == 'pending':
+        html += '<form method="POST">'
+    
+    for i, question in enumerate(assignment['questions']):
+        html += f'''
+            <div class="question">
+                <strong>Q{i+1}:</strong> {question}
+        '''
+        
+        if assignment['status'] == 'pending':
+            html += f'''
+                <div class="answer-box">
+                    <textarea name="answer_{i}" placeholder="Type your answer here..." required></textarea>
+                </div>
+            '''
+        elif assignment['status'] in ['submitted', 'under_review', 'published']:
+            answer = assignment.get('answers', {}).get(str(i), '')
+            html += f'''
+                <div class="answer-box">
+                    <strong>Your Answer:</strong><br>
+                    {answer}
+                </div>
+            '''
+            
+            if assignment['status'] == 'published':
+                final_score = assignment.get('final_scores', {}).get(str(i), 0)
+                html += f'<p><strong>Score: {final_score}/10</strong></p>'
+        
+        html += '</div>'
+    
+    if assignment['status'] == 'pending':
+        html += '''
+            <button type="submit" style="margin-top: 20px;">Submit All Answers</button>
+            </form>
+        '''
+    
+    html += '''
+                <a href="/student"><button type="button">Back to Dashboard</button></a>
+            </div>
+        </div>
+    </body>
+    </html>
+    '''
+    return html
 
-@app.route('/api/test-system', methods=['POST'])
-@admin_required
-def api_test_system():
-    """Test system components"""
-    status = scanner.get_system_status()
-    return jsonify(status)
+@app.route('/api/health')
+def health():
+    return jsonify({'status': 'ok', 'users': len(users), 'assignments': len(assignments)})
 
-@app.route('/api/status')
-@admin_required
-def api_status():
-    """Get system status"""
-    return jsonify(scanner.get_system_status())
+# Initialize
+init_users()
 
-@app.route('/api/logs')
-@admin_required
-def api_logs():
-    """Get recent logs"""
-    return jsonify(scanner.logs)
-
-@app.route('/api/classification-report')
-@admin_required
-def api_classification_report():
-    """Get classification statistics report"""
-    report = scanner.get_classification_report()
-    return jsonify(report)
+# Create demo assignment
+if len(assignments) == 0:
+    create_assignment('eng001', 'floorplanning')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False) resume_results['files'][0]['id']
-                self.add_log("✅ Found existing Resumes folder", 'success')
-            else:
-                resume_metadata = {
-                    'name': 'Resumes by Domain',
-                    'parents': [parent_folder_id],
-                    'mimeType': 'application/vnd.google-apps.folder'
-                }
-                resume_folder = self.drive_service.files().create(body=resume_metadata, fields='id').execute()
-                self.resume_folder_id =
+    app.run(host='0.0.0.0', port=port, debug=False)
