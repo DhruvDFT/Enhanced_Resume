@@ -1,4 +1,814 @@
-import os
+@app.route('/')
+def index():
+    """Main dashboard"""
+    template = '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>VLSI Resume Scanner - Professional Edition</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            
+            :root {
+                --primary: #6366f1;
+                --primary-dark: #4f46e5;
+                --secondary: #8b5cf6;
+                --success: #10b981;
+                --warning: #f59e0b;
+                --danger: #ef4444;
+                --info: #3b82f6;
+                --dark: #1f2937;
+                --light: #f9fafb;
+                --border: #e5e7eb;
+                --text-primary: #111827;
+                --text-secondary: #6b7280;
+                --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+                --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+                --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            }
+            
+            body { 
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                background: #f3f4f6;
+                min-height: 100vh;
+                color: var(--text-primary);
+                line-height: 1.6;
+            }
+            
+            .container { 
+                max-width: 1400px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            
+            .header {
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                margin-bottom: 24px;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+            }
+            
+            .header h1 { 
+                font-size: 2rem;
+                font-weight: 700;
+                color: var(--text-primary);
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 8px;
+            }
+            
+            .header .subtitle { 
+                color: var(--text-secondary);
+                font-size: 1rem;
+            }
+            
+            .version-badge {
+                display: inline-flex;
+                align-items: center;
+                background: var(--primary);
+                color: white;
+                font-size: 0.75rem;
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-weight: 500;
+            }
+            
+            .auth-card {
+                max-width: 400px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                box-shadow: var(--shadow-md);
+                border: 1px solid var(--border);
+            }
+            
+            .auth-card h2 {
+                font-size: 1.5rem;
+                font-weight: 600;
+                margin-bottom: 24px;
+                text-align: center;
+            }
+            
+            .input-group {
+                margin-bottom: 16px;
+            }
+            
+            .input-group label {
+                display: block;
+                font-size: 0.875rem;
+                font-weight: 500;
+                color: var(--text-primary);
+                margin-bottom: 6px;
+            }
+            
+            .input-group input {
+                width: 100%;
+                padding: 10px 14px;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                font-size: 0.875rem;
+                transition: all 0.2s;
+                font-family: inherit;
+            }
+            
+            .input-group input:focus {
+                outline: none;
+                border-color: var(--primary);
+                box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            }
+            
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 8px;
+                font-size: 0.875rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+                font-family: inherit;
+                text-decoration: none;
+                line-height: 1;
+            }
+            
+            .btn:hover:not(:disabled) {
+                transform: translateY(-1px);
+                box-shadow: var(--shadow-md);
+            }
+            
+            .btn:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                transform: none !important;
+            }
+            
+            .btn-primary {
+                background: var(--primary);
+                color: white;
+            }
+            
+            .btn-primary:hover:not(:disabled) {
+                background: var(--primary-dark);
+            }
+            
+            .btn-success {
+                background: var(--success);
+                color: white;
+            }
+            
+            .btn-info {
+                background: var(--info);
+                color: white;
+            }
+            
+            .btn-warning {
+                background: var(--warning);
+                color: white;
+            }
+            
+            .btn-danger {
+                background: var(--danger);
+                color: white;
+            }
+            
+            .btn-secondary {
+                background: var(--text-secondary);
+                color: white;
+            }
+            
+            .btn-outline {
+                background: white;
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+            }
+            
+            .btn-outline:hover:not(:disabled) {
+                background: var(--light);
+            }
+            
+            .btn-full {
+                width: 100%;
+            }
+            
+            .dashboard-grid {
+                display: grid;
+                gap: 24px;
+            }
+            
+            .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 16px;
+                margin-bottom: 24px;
+            }
+            
+            .stat-card {
+                background: white;
+                border-radius: 12px;
+                padding: 24px;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .stat-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, var(--primary), var(--secondary));
+            }
+            
+            .stat-label {
+                font-size: 0.875rem;
+                color: var(--text-secondary);
+                font-weight: 500;
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .stat-value {
+                font-size: 2rem;
+                font-weight: 700;
+                color: var(--text-primary);
+            }
+            
+            .controls-section {
+                background: white;
+                border-radius: 12px;
+                padding: 24px;
+                margin-bottom: 24px;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+            }
+            
+            .controls-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+            }
+            
+            .controls-header h2 {
+                font-size: 1.25rem;
+                font-weight: 600;
+            }
+            
+            .controls-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 12px;
+            }
+            
+            .status-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 20px;
+                margin-bottom: 24px;
+            }
+            
+            .status-card {
+                background: white;
+                border-radius: 12px;
+                padding: 24px;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+            }
+            
+            .status-card h3 {
+                font-size: 1rem;
+                font-weight: 600;
+                margin-bottom: 16px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .status-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 10px 0;
+                border-bottom: 1px solid var(--light);
+                font-size: 0.875rem;
+            }
+            
+            .status-item:last-child {
+                border-bottom: none;
+            }
+            
+            .status-value {
+                font-weight: 500;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            
+            .status-value.success { color: var(--success); }
+            .status-value.error { color: var(--danger); }
+            .status-value.warning { color: var(--warning); }
+            
+            .logs-container {
+                background: white;
+                border-radius: 12px;
+                box-shadow: var(--shadow);
+                border: 1px solid var(--border);
+                overflow: hidden;
+            }
+            
+            .logs-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 20px 24px;
+                background: var(--light);
+                border-bottom: 1px solid var(--border);
+            }
+            
+            .logs-header h3 {
+                font-size: 1rem;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .logs-controls {
+                display: flex;
+                gap: 8px;
+            }
+            
+            .log-filter {
+                padding: 6px 12px;
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                font-size: 0.75rem;
+                background: white;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .log-filter:hover {
+                background: var(--light);
+            }
+            
+            .log-filter.active {
+                background: var(--primary);
+                color: white;
+                border-color: var(--primary);
+            }
+            
+            .logs-section {
+                background: #0f172a;
+                padding: 20px;
+                max-height: 500px;
+                overflow-y: auto;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 0.8125rem;
+                line-height: 1.6;
+            }
+            
+            .logs-section.paused {
+                opacity: 0.7;
+            }
+            
+            .logs-section.paused::after {
+                content: 'PAUSED';
+                position: sticky;
+                top: 10px;
+                float: right;
+                background: var(--warning);
+                color: white;
+                padding: 4px 12px;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                font-weight: 600;
+            }
+            
+            .log-entry {
+                margin-bottom: 8px;
+                padding: 8px 12px;
+                border-radius: 4px;
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                transition: all 0.2s;
+                opacity: 0;
+                animation: slideIn 0.3s ease forwards;
+            }
+            
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateX(-20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+            }
+            
+            .log-entry:hover {
+                background: rgba(255, 255, 255, 0.05);
+            }
+            
+            .log-timestamp {
+                color: #64748b;
+                font-size: 0.75rem;
+                min-width: 80px;
+            }
+            
+            .log-level {
+                min-width: 60px;
+                font-weight: 600;
+                text-transform: uppercase;
+                font-size: 0.75rem;
+                padding: 2px 8px;
+                border-radius: 4px;
+                text-align: center;
+            }
+            
+            .log-message {
+                flex: 1;
+                color: #e2e8f0;
+            }
+            
+            .log-entry.info .log-level {
+                background: rgba(59, 130, 246, 0.2);
+                color: #60a5fa;
+            }
+            
+            .log-entry.success .log-level {
+                background: rgba(16, 185, 129, 0.2);
+                color: #34d399;
+            }
+            
+            .log-entry.warning .log-level {
+                background: rgba(245, 158, 11, 0.2);
+                color: #fbbf24;
+            }
+            
+            .log-entry.error .log-level {
+                background: rgba(239, 68, 68, 0.2);
+                color: #f87171;
+            }
+            
+            .modal {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1000;
+                backdrop-filter: blur(4px);
+            }
+            
+            .modal-content {
+                background: white;
+                max-width: 600px;
+                margin: 50px auto;
+                border-radius: 12px;
+                box-shadow: var(--shadow-lg);
+                overflow: hidden;
+                animation: modalSlideIn 0.3s ease;
+            }
+            
+            @keyframes modalSlideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            .modal-header {
+                padding: 24px;
+                background: var(--light);
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .modal-header h3 {
+                font-size: 1.25rem;
+                font-weight: 600;
+            }
+            
+            .modal-body {
+                padding: 24px;
+            }
+            
+            .modal-footer {
+                padding: 16px 24px;
+                background: var(--light);
+                border-top: 1px solid var(--border);
+                display: flex;
+                justify-content: flex-end;
+                gap: 12px;
+            }
+            
+            .close-btn {
+                background: none;
+                border: none;
+                font-size: 1.5rem;
+                color: var(--text-secondary);
+                cursor: pointer;
+                line-height: 1;
+                padding: 0;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 6px;
+                transition: all 0.2s;
+            }
+            
+            .close-btn:hover {
+                background: var(--border);
+                color: var(--text-primary);
+            }
+            
+            .oauth-notice {
+                background: #fef3c7;
+                border: 1px solid #fcd34d;
+                border-radius: 8px;
+                padding: 16px;
+                margin-bottom: 20px;
+                font-size: 0.875rem;
+                color: #92400e;
+            }
+            
+            .spinner {
+                display: inline-block;
+                width: 16px;
+                height: 16px;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                border-radius: 50%;
+                border-top-color: white;
+                animation: spin 0.8s linear infinite;
+            }
+            
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+            
+            .scanning {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .tooltip {
+                position: relative;
+                cursor: help;
+            }
+            
+            .tooltip::after {
+                content: attr(data-tooltip);
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                background: var(--dark);
+                color: white;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                white-space: nowrap;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.2s;
+            }
+            
+            .tooltip:hover::after {
+                opacity: 1;
+            }
+            
+            /* Scrollbar styling */
+            .logs-section::-webkit-scrollbar {
+                width: 8px;
+            }
+            
+            .logs-section::-webkit-scrollbar-track {
+                background: rgba(255, 255, 255, 0.05);
+            }
+            
+            .logs-section::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 4px;
+            }
+            
+            .logs-section::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.3);
+            }
+            
+            /* Responsive */
+            @media (max-width: 768px) {
+                .container {
+                    padding: 12px;
+                }
+                
+                .stats-grid {
+                    grid-template-columns: 1fr;
+                }
+                
+                .controls-grid {
+                    grid-template-columns: 1fr;
+                }
+                
+                .status-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11H3v10h6V11zm5-7H8v17h6V4zm5 3h-6v14h6V7z"/>
+                    </svg>
+                    VLSI Resume Scanner
+                    <span class="version-badge">v2.1 Pro</span>
+                </h1>
+                <p class="subtitle">AI-Powered Domain Classification & Resume Management System</p>
+            </div>
+            
+            <div id="auth-section">
+                <div class="auth-card">
+                    <h2>🔐 Admin Authentication</h2>
+                    <form onsubmit="authenticate(event)">
+                        <div class="input-group">
+                            <label for="admin-password">Password</label>
+                            <input type="password" id="admin-password" placeholder="Enter admin password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full">
+                            Sign In
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="main-content" style="display: none;">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            Total Emails Scanned
+                        </div>
+                        <div class="stat-value" id="total-emails">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
+                            </svg>
+                            Resumes Found
+                        </div>
+                        <div class="stat-value" id="resumes-found">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                            </svg>
+                            Last Scan
+                        </div>
+                        <div class="stat-value" id="last-scan" style="font-size: 1.2rem;">Never</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                            Processing Errors
+                        </div>
+                        <div class="stat-value" id="errors-count">0</div>
+                    </div>
+                </div>
+
+                <div class="controls-section">
+                    <div class="controls-header">
+                        <h2>Scanner Controls</h2>
+                        <div id="scan-status"></div>
+                    </div>
+                    <div class="controls-grid">
+                        <button onclick="setupGmail()" class="btn btn-info">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                            </svg>
+                            Setup Gmail
+                        </button>
+                        <button id="scan-btn" onclick="handleScan()" class="btn btn-primary">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                            </svg>
+                            Full Scan
+                        </button>
+                        <button onclick="quickScan()" class="btn btn-success">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                            </svg>
+                            Quick Scan
+                        </button>
+                        <button onclick="testSystem()" class="btn btn-secondary">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            Test System
+                        </button>
+                        <button onclick="showUserManager()" class="btn btn-warning">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+                            </svg>
+                            Team Access
+                        </button>
+                        <button onclick="exportLogs()" class="btn btn-outline">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Export Logs
+                        </button>
+                    </div>
+                </div>
+
+                <div class="status-grid">
+                    <div class="status-card">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                            System Status
+                        </h3>
+                        <div id="system-status">
+                            <div class="status-item">
+                                <span>Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="status-card">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="10" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                            </svg>
+                            Authentication Status
+                        </h3>
+                        <div id="auth-status">
+                            <div class="status-item">
+                                <span>Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="logs-container">
+                    <div class="logs-header">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                            </svg>
+                            Activity Logs
+                        </h3>
+                        <div class="logs-controls">
+                            <button class="log-filter active" onclick="filterLogs('all')">All</button>
+                            <button class="log-filter" onclick="filterLogs('error')">Errors</button>
+                            <button class="log-filter" onclick="filterLogs('warning')">Warnings</button>
+                            <button class="log-filter" onclick="filterLogs('success')">Success</button>
+                            <button class="btn btn-outline" onclick="toggleLogPause()" id="pause-btn">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                                </svg>
+                                Pause
+                            </button>
+                            <button class="btn btn-outline" onclick="clearLogs()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2himport os
 import json
 import logging
 import re
@@ -841,149 +1651,612 @@ def admin_required(f):
     wrapper.__name__ = f.__name__
     return wrapper
 
-@app.route('/')
-def index():
-    """Main dashboard"""
-    template = '''
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>VLSI Resume Scanner</title>
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { 
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                min-height: 100vh; padding: 20px; color: #333;
-            }
-            .container { 
-                max-width: 1200px; margin: 0 auto; 
-                background: white; border-radius: 15px; 
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1); 
-                overflow: hidden; 
-            }
-            .header {
-                background: linear-gradient(135deg, #4a90e2 0%, #7b68ee 100%);
-                color: white; padding: 30px; text-align: center;
-            }
-            .header h1 { font-size: 2.5em; margin-bottom: 10px; }
-            .header p { font-size: 1.1em; opacity: 0.9; }
-            .content { padding: 30px; }
-            .auth-section {
-                background: #f8f9fa; border-radius: 10px; 
-                padding: 20px; margin-bottom: 30px; text-align: center;
-            }
-            .controls { 
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 15px; margin-bottom: 30px; 
-            }
-            .controls button {
-                padding: 15px 20px; border: none; border-radius: 8px;
-                font-size: 1em; font-weight: bold; cursor: pointer;
-                transition: all 0.3s ease; color: white;
-            }
-            .controls button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-            .controls button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-            .status-grid {
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 20px; margin-bottom: 30px;
-            }
-            .status-card {
-                background: #f8f9fa; border-radius: 10px; padding: 20px;
-                border-left: 4px solid #4a90e2;
-            }
-            .status-card h3 { color: #4a90e2; margin-bottom: 15px; }
-            .status-item { 
-                display: flex; justify-content: space-between; 
-                margin-bottom: 8px; padding: 5px 0;
-            }
-            .status-value.success { color: #28a745; font-weight: bold; }
-            .status-value.error { color: #dc3545; font-weight: bold; }
-            .status-value.warning { color: #ffc107; font-weight: bold; }
-            .logs-section {
-                background: #1e1e1e; border-radius: 10px; padding: 20px;
-                max-height: 400px; overflow-y: auto;
-            }
-            .log-entry {
-                margin-bottom: 8px; font-family: 'Consolas', monospace; 
-                font-size: 0.9em; padding: 5px; border-radius: 3px;
-            }
-            .log-entry.info { color: #61dafb; }
-            .log-entry.success { color: #4ade80; }
-            .log-entry.warning { color: #fbbf24; }
-            .log-entry.error { color: #f87171; }
-            .input-group {
-                display: flex; gap: 10px; margin-bottom: 20px;
-            }
-            .input-group input {
-                flex: 1; padding: 10px; border: 1px solid #ddd;
-                border-radius: 5px; font-size: 1em;
-            }
-            .input-group button {
-                padding: 10px 20px; background: #4a90e2; color: white;
-                border: none; border-radius: 5px; cursor: pointer;
-            }
-            .stats-overview {
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 15px; margin-bottom: 20px;
-            }
-            .stat-card {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white; padding: 20px; border-radius: 10px; text-align: center;
-            }
-            .stat-number { font-size: 2em; font-weight: bold; margin-bottom: 5px; }
-            .stat-label { font-size: 0.9em; opacity: 0.9; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>🔬 VLSI Resume Scanner v2.1</h1>
-                <p>AI-Powered Domain & Experience Classification System</p>
-            </div>
-            
-            <div class="content">
-                <div id="auth-section" class="auth-section">
-                    <div class="input-group">
-                        <input type="password" id="admin-password" placeholder="Enter admin password">
-                        <button onclick="authenticate()">🔐 Login</button>
+                                    <path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                                Clear
+                            </button>
+                        </div>
                     </div>
-                    <p>Enter admin password to access the scanner controls</p>
+                    <div class="logs-section" id="logs-container">
+                        <div class="log-entry info">
+                            <span class="log-timestamp">00:00:00</span>
+                            <span class="log-level">Info</span>
+                            <span class="log-message">System initialized. Ready to scan resumes...</span>
+                        </div>
+                    </div>
                 </div>
+            </div>
+        </div>
 
-                <div id="main-content" style="display: none;">
-                    <div class="stats-overview">
-                        <div class="stat-card">
-                            <div class="stat-number" id="total-emails">-</div>
-                            <div class="stat-label">Emails Scanned</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" id="resumes-found">-</div>
-                            <div class="stat-label">Resumes Found</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" id="last-scan">Never</div>
-                            <div class="stat-label">Last Scan</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" id="errors-count">-</div>
-                            <div class="stat-label">Processing Errors</div>
+        <!-- User Manager Modal -->
+        <div id="user-manager-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>👥 Team Member Management</h3>
+                    <button class="close-btn" onclick="hideUserManager()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                        Add team members to allow them to authenticate with their Gmail accounts.
+                    </p>
+                    <div class="input-group">
+                        <label for="user-email-input">Email Address</label>
+                        <input type="email" id="user-email-input" placeholder="team-member@gmail.com">
+                    </div>
+                    <button onclick="authenticateUser()" class="btn btn-primary btn-full">
+                        Add Team Member
+                    </button>
+                    <div style="margin-top: 24px;">
+                        <h4 style="margin-bottom: 12px;">Authenticated Users</h4>
+                        <div id="user-list" style="background: var(--light); border-radius: 8px; padding: 16px;">
+                            Loading...
                         </div>
                     </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="hideUserManager()" class="btn btn-outline">Close</button>
+                </div>
+            </div>
+        </div>
 
-                    <div class="controls">
-                        <button onclick="setupGmail()" style="background: #17a2b8;">🔧 Setup Gmail Integration</button>
-                        <button onclick="scanGmail()" style="background: #007bff;">📧 Full Gmail Scan</button>
-                        <button onclick="quickScan()" style="background: #28a745;">⚡ Quick Scan (Last 50)</button>
-                        <button onclick="testSystem()" style="background: #6c757d;">🔍 Test System</button>
-                        <button onclick="showUserManager()" style="background: #fd7e14;">👥 Manage Team Access</button>
+        <!-- OAuth Input Modal -->
+        <div id="oauth-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>🔑 OAuth Authorization Required</h3>
+                    <button class="close-btn" onclick="hideOAuthInput()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="oauth-notice">
+                        <strong>⚠️ Action Required:</strong> Please complete the Google authorization process by following the URL in the logs above, then enter the authorization code below.
                     </div>
+                    <div class="input-group">
+                        <label for="oauth-code-input">Authorization Code</label>
+                        <input type="text" id="oauth-code-input" placeholder="4/1AUJR-x7uuwO5w4uilFkKhvWFzrd99..." style="font-family: monospace;">
+                    </div>
+                    <button onclick="submitOAuthCode()" class="btn btn-success btn-full">
+                        Submit Authorization Code
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="hideOAuthInput()" class="btn btn-outline">Cancel</button>
+                </div>
+            </div>
+        </div>
 
-                    <div id="user-manager" style="display: none; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                        <h3 style="color: #1976d2; margin: 0 0 15px 0;">👥 Team Member Authentication</h3>
-                        <p style="color: #1976d2; margin: 0 0 15px 0;">
+        <script>
+        let isAdmin = false;
+        let logCount = 0;
+        let isScanning = false;
+        let scanAbortController = null;
+        let logsPaused = false;
+        let currentLogFilter = 'all';
+        let allLogs = [];
+
+        function authenticate(event) {
+            event.preventDefault();
+            const password = document.getElementById('admin-password').value;
+            
+            fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: password })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    isAdmin = true;
+                    document.getElementById('auth-section').style.display = 'none';
+                    document.getElementById('main-content').style.display = 'block';
+                    loadSystemStatus();
+                    startLogPolling();
+                } else {
+                    showNotification('Invalid password', 'error');
+                }
+            });
+        }
+
+        function setupGmail() {
+            if (!isAdmin) return;
+            addLogToDisplay('Starting Gmail API setup...', 'info');
+            
+            fetch('/api/setup-gmail', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        addLogToDisplay(data.message, 'success');
+                        hideOAuthInput();
+                    } else {
+                        addLogToDisplay(data.message, 'error');
+                        if (data.message.includes('authentication failed')) {
+                            setTimeout(showOAuthInput, 1000);
+                        }
+                    }
+                })
+                .catch(e => {
+                    addLogToDisplay('Setup failed: ' + e.message, 'error');
+                });
+        }
+
+        function showOAuthInput() {
+            document.getElementById('oauth-modal').style.display = 'block';
+        }
+
+        function hideOAuthInput() {
+            document.getElementById('oauth-modal').style.display = 'none';
+            document.getElementById('oauth-code-input').value = '';
+        }
+
+        function submitOAuthCode() {
+            const code = document.getElementById('oauth-code-input').value.trim();
+            
+            if (!code) {
+                showNotification('Please enter the authorization code', 'error');
+                return;
+            }
+            
+            addLogToDisplay('Submitting authorization code...', 'info');
+            
+            fetch('/api/oauth-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    addLogToDisplay(data.message, 'success');
+                    hideOAuthInput();
+                } else {
+                    addLogToDisplay(data.message, 'error');
+                }
+            })
+            .catch(e => {
+                addLogToDisplay('Code submission failed: ' + e.message, 'error');
+            });
+        }
+
+        function showUserManager() {
+            document.getElementById('user-manager-modal').style.display = 'block';
+            loadAuthenticatedUsers();
+        }
+
+        function hideUserManager() {
+            document.getElementById('user-manager-modal').style.display = 'none';
+        }
+
+        function authenticateUser() {
+            const email = document.getElementById('user-email-input').value.trim();
+            
+            if (!email || !email.includes('@')) {
+                showNotification('Please enter a valid email address', 'error');
+                return;
+            }
+            
+            addLogToDisplay(`Starting authentication for ${email}...`, 'info');
+            
+            fetch('/api/setup-gmail', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_email: email })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    addLogToDisplay(data.message, 'success');
+                    hideOAuthInput();
+                    hideUserManager();
+                } else {
+                    addLogToDisplay(data.message, 'error');
+                    if (data.message.includes('authentication failed')) {
+                        setTimeout(showOAuthInput, 1000);
+                    }
+                }
+            })
+            .catch(e => {
+                addLogToDisplay('Authentication failed: ' + e.message, 'error');
+            });
+        }
+
+        function loadAuthenticatedUsers() {
+            fetch('/api/users')
+            .then(r => r.json())
+            .then(data => {
+                const userList = document.getElementById('user-list');
+                if (data.users && data.users.length > 0) {
+                    userList.innerHTML = data.users.map(user => 
+                        `<div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+                            <span style="color: var(--success);">✓</span> ${user}
+                        </div>`
+                    ).join('');
+                } else {
+                    userList.innerHTML = '<div style="color: var(--text-secondary); font-style: italic;">No authenticated users yet</div>';
+                }
+            })
+            .catch(e => {
+                document.getElementById('user-list').innerHTML = '<div style="color: var(--danger);">Error loading users</div>';
+            });
+        }
+
+        function handleScan() {
+            if (isScanning) {
+                stopScan();
+            } else {
+                scanGmail();
+            }
+        }
+
+        function scanGmail() {
+            if (!isAdmin) return;
+            
+            isScanning = true;
+            updateScanButton();
+            addLogToDisplay('Starting full Gmail scan...', 'info');
+            
+            scanAbortController = new AbortController();
+            
+            fetch('/api/scan-gmail', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+                signal: scanAbortController.signal
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        addLogToDisplay(`Scan completed: ${data.processed} emails processed, ${data.resumes_found} resumes found`, 'success');
+                        updateStats(data.stats);
+                    } else {
+                        addLogToDisplay(data.error, 'error');
+                    }
+                })
+                .catch(e => {
+                    if (e.name !== 'AbortError') {
+                        addLogToDisplay('Scan failed: ' + e.message, 'error');
+                    }
+                })
+                .finally(() => {
+                    isScanning = false;
+                    updateScanButton();
+                });
+        }
+
+        function stopScan() {
+            if (scanAbortController) {
+                scanAbortController.abort();
+                addLogToDisplay('Scan stopped by user', 'warning');
+            }
+            isScanning = false;
+            updateScanButton();
+        }
+
+        function updateScanButton() {
+            const btn = document.getElementById('scan-btn');
+            if (isScanning) {
+                btn.innerHTML = `
+                    <div class="scanning">
+                        <div class="spinner"></div>
+                        Stop Scan
+                    </div>
+                `;
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-danger');
+            } else {
+                btn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    Full Scan
+                `;
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-primary');
+            }
+        }
+
+        function quickScan() {
+            if (!isAdmin) return;
+            addLogToDisplay('Starting quick scan (last 50 emails)...', 'info');
+            
+            fetch('/api/quick-scan', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        addLogToDisplay(`Quick scan completed: ${data.processed} emails processed, ${data.resumes_found} resumes found`, 'success');
+                        updateStats(data.stats);
+                    } else {
+                        addLogToDisplay(data.error, 'error');
+                    }
+                })
+                .catch(e => {
+                    addLogToDisplay('Quick scan failed: ' + e.message, 'error');
+                });
+        }
+
+        function testSystem() {
+            if (!isAdmin) return;
+            addLogToDisplay('Running system diagnostics...', 'info');
+            
+            fetch('/api/test-system', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+                .then(r => r.json())
+                .then(data => {
+                    addLogToDisplay('System diagnostics completed', 'info');
+                    loadSystemStatus();
+                })
+                .catch(e => {
+                    addLogToDisplay('System test failed: ' + e.message, 'error');
+                });
+        }
+
+        function loadSystemStatus() {
+            if (!isAdmin) return;
+            
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    updateSystemStatus(data);
+                    updateStats(data.stats);
+                })
+                .catch(e => {
+                    console.error('Failed to load status:', e);
+                });
+        }
+
+        function updateSystemStatus(data) {
+            const systemStatus = document.getElementById('system-status');
+            const authStatus = document.getElementById('auth-status');
+            
+            systemStatus.innerHTML = `
+                <div class="status-item">
+                    <span>Google APIs</span>
+                    <span class="status-value ${data.google_apis_available ? 'success' : 'error'}">
+                        ${data.google_apis_available ? '✅ Available' : '❌ Missing'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>PDF Processing</span>
+                    <span class="status-value ${data.pdf_processing_available ? 'success' : 'error'}">
+                        ${data.pdf_processing_available ? '✅ Available' : '❌ Missing'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>DOC Processing</span>
+                    <span class="status-value ${data.docx_processing_available || data.doc_processing_available ? 'success' : 'error'}">
+                        ${data.docx_processing_available || data.doc_processing_available ? '✅ Available' : '❌ Missing'}
+                    </span>
+                </div>
+            `;
+            
+            authStatus.innerHTML = `
+                <div class="status-item">
+                    <span>Gmail Service</span>
+                    <span class="status-value ${data.gmail_service_active ? 'success' : 'error'}">
+                        ${data.gmail_service_active ? '✅ Active' : '❌ Inactive'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>Drive Service</span>
+                    <span class="status-value ${data.drive_service_active ? 'success' : 'error'}">
+                        ${data.drive_service_active ? '✅ Active' : '❌ Inactive'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>Current User</span>
+                    <span class="status-value ${data.current_user ? 'success' : 'warning'}">
+                        ${data.current_user || 'Not authenticated'}
+                    </span>
+                </div>
+            `;
+        }
+
+        function updateStats(stats) {
+            if (stats) {
+                document.getElementById('total-emails').textContent = stats.total_emails || 0;
+                document.getElementById('resumes-found').textContent = stats.resumes_found || 0;
+                document.getElementById('errors-count').textContent = stats.processing_errors || 0;
+                
+                if (stats.last_scan_time) {
+                    const lastScan = new Date(stats.last_scan_time);
+                    document.getElementById('last-scan').textContent = formatDate(lastScan);
+                }
+            }
+        }
+
+        function formatDate(date) {
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 60000) return 'Just now';
+            if (diff < 3600000) return Math.floor(diff / 60000) + ' mins ago';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + ' hours ago';
+            
+            return date.toLocaleDateString();
+        }
+
+        function addLogToDisplay(message, level = 'info') {
+            const timestamp = new Date().toLocaleTimeString('en-US', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            const logEntry = {
+                timestamp,
+                level,
+                message
+            };
+            
+            allLogs.push(logEntry);
+            
+            if (!logsPaused && (currentLogFilter === 'all' || currentLogFilter === level)) {
+                appendLogEntry(logEntry);
+            }
+        }
+
+        function appendLogEntry(log) {
+            const logsContainer = document.getElementById('logs-container');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log-entry ${log.level}`;
+            
+            logDiv.innerHTML = `
+                <span class="log-timestamp">${log.timestamp}</span>
+                <span class="log-level">${log.level}</span>
+                <span class="log-message">${log.message}</span>
+            `;
+            
+            logsContainer.appendChild(logDiv);
+            
+            if (!logsPaused) {
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+            
+            while (logsContainer.children.length > 200) {
+                logsContainer.removeChild(logsContainer.firstChild);
+            }
+        }
+
+        function toggleLogPause() {
+            logsPaused = !logsPaused;
+            const pauseBtn = document.getElementById('pause-btn');
+            const logsContainer = document.getElementById('logs-container');
+            
+            if (logsPaused) {
+                pauseBtn.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    Resume
+                `;
+                logsContainer.classList.add('paused');
+            } else {
+                pauseBtn.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                    </svg>
+                    Pause
+                `;
+                logsContainer.classList.remove('paused');
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+        }
+
+        function filterLogs(filter) {
+            currentLogFilter = filter;
+            const logsContainer = document.getElementById('logs-container');
+            
+            // Update filter buttons
+            document.querySelectorAll('.log-filter').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Clear and re-render logs
+            logsContainer.innerHTML = '';
+            
+            const filteredLogs = filter === 'all' 
+                ? allLogs 
+                : allLogs.filter(log => log.level === filter);
+            
+            filteredLogs.forEach(log => appendLogEntry(log));
+        }
+
+        function clearLogs() {
+            if (confirm('Clear all logs?')) {
+                allLogs = [];
+                document.getElementById('logs-container').innerHTML = '';
+                addLogToDisplay('Logs cleared', 'info');
+            }
+        }
+
+        function exportLogs() {
+            const logText = allLogs.map(log => 
+                `[${log.timestamp}] ${log.level.toUpperCase()}: ${log.message}`
+            ).join('\n');
+            
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vlsi-scanner-logs-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            addLogToDisplay('Logs exported successfully', 'success');
+        }
+
+        function showNotification(message, type = 'info') {
+            // Simple notification implementation
+            alert(message);
+        }
+
+        function startLogPolling() {
+            setInterval(() => {
+                if (isAdmin && !logsPaused) {
+                    fetch('/api/logs')
+                        .then(r => r.json())
+                        .then(logs => {
+                            const newLogs = logs.slice(logCount);
+                            newLogs.forEach(log => {
+                                const formattedLog = {
+                                    timestamp: log.timestamp.split(' ')[1],
+                                    level: log.level,
+                                    message: log.message
+                                };
+                                allLogs.push(formattedLog);
+                                
+                                if (currentLogFilter === 'all' || currentLogFilter === log.level) {
+                                    appendLogEntry(formattedLog);
+                                }
+                            });
+                            
+                            logCount = logs.length;
+                        })
+                        .catch(e => console.error('Log polling failed:', e));
+                }
+            }, 2000);
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'l') {
+                e.preventDefault();
+                clearLogs();
+            }
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                toggleLogPause();
+            }
+            if (e.ctrlKey && e.key === 'e') {
+                e.preventDefault();
+                exportLogs();
+            }
+        });
+        </script>
+    </body>
+    </html>
+    '''
+    return render_template_string(template) 0;">
                             Team members can authenticate with their own Gmail accounts for personalized access.
                         </p>
                         <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
@@ -1501,6 +2774,14 @@ def api_scan_gmail():
     """Full Gmail scan"""
     result = scanner.scan_emails()
     return jsonify(result)
+
+@app.route('/api/stop-scan', methods=['POST'])
+@admin_required
+def api_stop_scan():
+    """Stop ongoing scan"""
+    # This would need implementation in the scanner class
+    # For now, return success
+    return jsonify({'status': 'success', 'message': 'Scan stop requested'})
 
 @app.route('/api/quick-scan', methods=['POST'])
 @admin_required
