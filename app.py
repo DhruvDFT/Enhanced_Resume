@@ -808,7 +808,11 @@ def index():
                             </button>
                             <button class="btn btn-outline" onclick="clearLogs()">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2himport os
+                                    <path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""VLSI Resume Scanner v2.1 - Professional Edition"""
+
+import os
 import json
 import logging
 import re
@@ -2110,7 +2114,7 @@ def admin_required(f):
             const logDiv = document.createElement('div');
             logDiv.className = `log-entry ${log.level}`;
             
-            logDiv.innerHTML = `
+                        logDiv.innerHTML = `
                 <span class="log-timestamp">${log.timestamp}</span>
                 <span class="log-level">${log.level}</span>
                 <span class="log-message">${log.message}</span>
