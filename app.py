@@ -1,3 +1,1029 @@
+<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                            Processing Errors
+                        </div>
+                        <div class="stat-value" id="errors-count">0</div>
+                    </div>
+                </div>
+
+                <div class="controls-section">
+                    <div class="controls-header">
+                        <h2>Scanner Controls</h2>
+                        <div id="scan-status"></div>
+                    </div>
+                    <div class="controls-grid">
+                        <button onclick="setupGmail()" class="btn btn-info">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                            </svg>
+                            Setup Gmail
+                        </button>
+                        <button id="scan-btn" onclick="handleScan()" class="btn btn-primary">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                            </svg>
+                            Full Scan
+                        </button>
+                        <button onclick="quickScan()" class="btn btn-success">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                            </svg>
+                            Quick Scan
+                        </button>
+                        <button onclick="testSystem()" class="btn btn-secondary">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            Test System
+                        </button>
+                        <button onclick="showUserManager()" class="btn btn-warning">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+                            </svg>
+                            Team Access
+                        </button>
+                        <button onclick="exportLogs()" class="btn btn-outline">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Export Logs
+                        </button>
+                    </div>
+                </div>
+
+                <div class="status-grid">
+                    <div class="status-card">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                            System Status
+                        </h3>
+                        <div id="system-status">
+                            <div class="status-item">
+                                <span>Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="status-card">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="10" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                            </svg>
+                            Authentication Status
+                        </h3>
+                        <div id="auth-status">
+                            <div class="status-item">
+                                <span>Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="logs-container">
+                    <div class="logs-header">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                            </svg>
+                            Activity Logs
+                        </h3>
+                        <div class="logs-controls">
+                            <button class="log-filter active" onclick="filterLogs('all')">All</button>
+                            <button class="log-filter" onclick="filterLogs('error')">Errors</button>
+                            <button class="log-filter" onclick="filterLogs('warning')">Warnings</button>
+                            <button class="log-filter" onclick="filterLogs('success')">Success</button>
+                            <button class="btn btn-outline" onclick="toggleLogPause()" id="pause-btn">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                                </svg>
+                                Pause
+                            </button>
+                            <button class="btn btn-outline" onclick="clearLogs()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                    <div class="logs-section" id="logs-container">
+                        <div class="log-entry info">
+                            <span class="log-timestamp">00:00:00</span>
+                            <span class="log-level">Info</span>
+                            <span class="log-message">System initialized. Ready to scan resumes...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Manager Modal -->
+        <div id="user-manager-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>👥 Team Member Management</h3>
+                    <button class="close-btn" onclick="hideUserManager()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                        Add team members to allow them to authenticate with their Gmail accounts.
+                    </p>
+                    <div class="input-group">
+                        <label for="user-email-input">Email Address</label>
+                        <input type="email" id="user-email-input" placeholder="team-member@gmail.com">
+                    </div>
+                    <button onclick="authenticateUser()" class="btn btn-primary btn-full">
+                        Add Team Member
+                    </button>
+                    <div style="margin-top: 24px;">
+                        <h4 style="margin-bottom: 12px;">Authenticated Users</h4>
+                        <div id="user-list" style="background: var(--light); border-radius: 8px; padding: 16px;">
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="hideUserManager()" class="btn btn-outline">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- OAuth Input Modal -->
+        <div id="oauth-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>🔑 OAuth Authorization Required</h3>
+                    <button class="close-btn" onclick="hideOAuthInput()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="oauth-notice">
+                        <strong>⚠️ Action Required:</strong> Please complete the Google authorization process by following the URL in the logs above, then enter the authorization code below.
+                    </div>
+                    <div class="input-group">
+                        <label for="oauth-code-input">Authorization Code</label>
+                        <input type="text" id="oauth-code-input" placeholder="4/1AUJR-x7uuwO5w4uilFkKhvWFzrd99..." style="font-family: monospace;">
+                    </div>
+                    <button onclick="submitOAuthCode()" class="btn btn-success btn-full">
+                        Submit Authorization Code
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="hideOAuthInput()" class="btn btn-outline">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        let isAdmin = false;
+        let logCount = 0;
+        let isScanning = false;
+        let scanAbortController = null;
+        let logsPaused = false;
+        let currentLogFilter = 'all';
+        let allLogs = [];
+
+        function authenticate(event) {
+            event.preventDefault();
+            const password = document.getElementById('admin-password').value;
+            
+            fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: password })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    isAdmin = true;
+                    document.getElementById('auth-section').style.display = 'none';
+                    document.getElementById('main-content').style.display = 'block';
+                    loadSystemStatus();
+                    startLogPolling();
+                } else {
+                    showNotification('Invalid password', 'error');
+                }
+            });
+        }
+
+        function setupGmail() {
+            if (!isAdmin) return;
+            addLogToDisplay('Starting Gmail API setup...', 'info');
+            
+            fetch('/api/setup-gmail', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        addLogToDisplay(data.message, 'success');
+                        hideOAuthInput();
+                    } else {
+                        addLogToDisplay(data.message, 'error');
+                        if (data.message.includes('authentication failed')) {
+                            setTimeout(showOAuthInput, 1000);
+                        }
+                    }
+                })
+                .catch(e => {
+                    addLogToDisplay('Setup failed: ' + e.message, 'error');
+                });
+        }
+
+        function showOAuthInput() {
+            document.getElementById('oauth-modal').style.display = 'block';
+        }
+
+        function hideOAuthInput() {
+            document.getElementById('oauth-modal').style.display = 'none';
+            document.getElementById('oauth-code-input').value = '';
+        }
+
+        function submitOAuthCode() {
+            const code = document.getElementById('oauth-code-input').value.trim();
+            
+            if (!code) {
+                showNotification('Please enter the authorization code', 'error');
+                return;
+            }
+            
+            addLogToDisplay('Submitting authorization code...', 'info');
+            
+            fetch('/api/oauth-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    addLogToDisplay(data.message, 'success');
+                    hideOAuthInput();
+                } else {
+                    addLogToDisplay(data.message, 'error');
+                }
+            })
+            .catch(e => {
+                addLogToDisplay('Code submission failed: ' + e.message, 'error');
+            });
+        }
+
+        function showUserManager() {
+            document.getElementById('user-manager-modal').style.display = 'block';
+            loadAuthenticatedUsers();
+        }
+
+        function hideUserManager() {
+            document.getElementById('user-manager-modal').style.display = 'none';
+        }
+
+        function authenticateUser() {
+            const email = document.getElementById('user-email-input').value.trim();
+            
+            if (!email || !email.includes('@')) {
+                showNotification('Please enter a valid email address', 'error');
+                return;
+            }
+            
+            addLogToDisplay(`Starting authentication for ${email}...`, 'info');
+            
+            fetch('/api/setup-gmail', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_email: email })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    addLogToDisplay(data.message, 'success');
+                    hideOAuthInput();
+                    hideUserManager();
+                } else {
+                    addLogToDisplay(data.message, 'error');
+                    if (data.message.includes('authentication failed')) {
+                        setTimeout(showOAuthInput, 1000);
+                    }
+                }
+            })
+            .catch(e => {
+                addLogToDisplay('Authentication failed: ' + e.message, 'error');
+            });
+        }
+
+        function loadAuthenticatedUsers() {
+            fetch('/api/users')
+            .then(r => r.json())
+            .then(data => {
+                const userList = document.getElementById('user-list');
+                if (data.users && data.users.length > 0) {
+                    userList.innerHTML = data.users.map(user => 
+                        `<div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+                            <span style="color: var(--success);">✓</span> ${user}
+                        </div>`
+                    ).join('');
+                } else {
+                    userList.innerHTML = '<div style="color: var(--text-secondary); font-style: italic;">No authenticated users yet</div>';
+                }
+            })
+            .catch(e => {
+                document.getElementById('user-list').innerHTML = '<div style="color: var(--danger);">Error loading users</div>';
+            });
+        }
+
+        function handleScan() {
+            if (isScanning) {
+                stopScan();
+            } else {
+                scanGmail();
+            }
+        }
+
+        function scanGmail() {
+            if (!isAdmin) return;
+            
+            isScanning = true;
+            updateScanButton();
+            addLogToDisplay('Starting full Gmail scan...', 'info');
+            
+            scanAbortController = new AbortController();
+            
+            fetch('/api/scan-gmail', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+                signal: scanAbortController.signal
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        addLogToDisplay(`Scan completed: ${data.processed} emails processed, ${data.resumes_found} resumes found`, 'success');
+                        updateStats(data.stats);
+                    } else {
+                        addLogToDisplay(data.error, 'error');
+                    }
+                })
+                .catch(e => {
+                    if (e.name !== 'AbortError') {
+                        addLogToDisplay('Scan failed: ' + e.message, 'error');
+                    }
+                })
+                .finally(() => {
+                    isScanning = false;
+                    updateScanButton();
+                });
+        }
+
+        function stopScan() {
+            if (scanAbortController) {
+                scanAbortController.abort();
+                addLogToDisplay('Scan stopped by user', 'warning');
+            }
+            isScanning = false;
+            updateScanButton();
+        }
+
+        function updateScanButton() {
+            const btn = document.getElementById('scan-btn');
+            if (isScanning) {
+                btn.innerHTML = `
+                    <div class="scanning">
+                        <div class="spinner"></div>
+                        Stop Scan
+                    </div>
+                `;
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-danger');
+            } else {
+                btn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    Full Scan
+                `;
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-primary');
+            }
+        }
+
+        function quickScan() {
+            if (!isAdmin) return;
+            addLogToDisplay('Starting quick scan (last 50 emails)...', 'info');
+            
+            fetch('/api/quick-scan', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        addLogToDisplay(`Quick scan completed: ${data.processed} emails processed, ${data.resumes_found} resumes found`, 'success');
+                        updateStats(data.stats);
+                    } else {
+                        addLogToDisplay(data.error, 'error');
+                    }
+                })
+                .catch(e => {
+                    addLogToDisplay('Quick scan failed: ' + e.message, 'error');
+                });
+        }
+
+        function testSystem() {
+            if (!isAdmin) return;
+            addLogToDisplay('Running system diagnostics...', 'info');
+            
+            fetch('/api/test-system', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+                .then(r => r.json())
+                .then(data => {
+                    addLogToDisplay('System diagnostics completed', 'info');
+                    loadSystemStatus();
+                })
+                .catch(e => {
+                    addLogToDisplay('System test failed: ' + e.message, 'error');
+                });
+        }
+
+        function loadSystemStatus() {
+            if (!isAdmin) return;
+            
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    updateSystemStatus(data);
+                    updateStats(data.stats);
+                })
+                .catch(e => {
+                    console.error('Failed to load status:', e);
+                });
+        }
+
+        function updateSystemStatus(data) {
+            const systemStatus = document.getElementById('system-status');
+            const authStatus = document.getElementById('auth-status');
+            
+            systemStatus.innerHTML = `
+                <div class="status-item">
+                    <span>Google APIs</span>
+                    <span class="status-value ${data.google_apis_available ? 'success' : 'error'}">
+                        ${data.google_apis_available ? '✅ Available' : '❌ Missing'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>PDF Processing</span>
+                    <span class="status-value ${data.pdf_processing_available ? 'success' : 'error'}">
+                        ${data.pdf_processing_available ? '✅ Available' : '❌ Missing'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>DOC Processing</span>
+                    <span class="status-value ${data.docx_processing_available || data.doc_processing_available ? 'success' : 'error'}">
+                        ${data.docx_processing_available || data.doc_processing_available ? '✅ Available' : '❌ Missing'}
+                    </span>
+                </div>
+            `;
+            
+            authStatus.innerHTML = `
+                <div class="status-item">
+                    <span>Gmail Service</span>
+                    <span class="status-value ${data.gmail_service_active ? 'success' : 'error'}">
+                        ${data.gmail_service_active ? '✅ Active' : '❌ Inactive'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>Drive Service</span>
+                    <span class="status-value ${data.drive_service_active ? 'success' : 'error'}">
+                        ${data.drive_service_active ? '✅ Active' : '❌ Inactive'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>Current User</span>
+                    <span class="status-value ${data.current_user ? 'success' : 'warning'}">
+                        ${data.current_user || 'Not authenticated'}
+                    </span>
+                </div>
+            `;
+        }
+
+        function updateStats(stats) {
+            if (stats) {
+                document.getElementById('total-emails').textContent = stats.total_emails || 0;
+                document.getElementById('resumes-found').textContent = stats.resumes_found || 0;
+                document.getElementById('errors-count').textContent = stats.processing_errors || 0;
+                
+                if (stats.last_scan_time) {
+                    const lastScan = new Date(stats.last_scan_time);
+                    document.getElementById('last-scan').textContent = formatDate(lastScan);
+                }
+            }
+        }
+
+        function formatDate(date) {
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 60000) return 'Just now';
+            if (diff < 3600000) return Math.floor(diff / 60000) + ' mins ago';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + ' hours ago';
+            
+            return date.toLocaleDateString();
+        }
+
+        function addLogToDisplay(message, level = 'info') {
+            const timestamp = new Date().toLocaleTimeString('en-US', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            const logEntry = {
+                timestamp,
+                level,
+                message
+            };
+            
+            allLogs.push(logEntry);
+            
+            if (!logsPaused && (currentLogFilter === 'all' || currentLogFilter === level)) {
+                appendLogEntry(logEntry);
+            }
+        }
+
+        function appendLogEntry(log) {
+            const logsContainer = document.getElementById('logs-container');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log-entry ${log.level}`;
+            
+            logDiv.innerHTML = `
+                <span class="log-timestamp">${log.timestamp}</span>
+                <span class="log-level">${log.level}</span>
+                <span class="log-message">${log.message}</span>
+            `;
+            
+            logsContainer.appendChild(logDiv);
+            
+            if (!logsPaused) {
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+            
+            while (logsContainer.children.length > 200) {
+                logsContainer.removeChild(logsContainer.firstChild);
+            }
+        }
+
+        function toggleLogPause() {
+            logsPaused = !logsPaused;
+            const pauseBtn = document.getElementById('pause-btn');
+            const logsContainer = document.getElementById('logs-container');
+            
+            if (logsPaused) {
+                pauseBtn.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    Resume
+                `;
+                logsContainer.classList.add('paused');
+            } else {
+                pauseBtn.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                    </svg>
+                    Pause
+                `;
+                logsContainer.classList.remove('paused');
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+        }
+
+        function filterLogs(filter) {
+            currentLogFilter = filter;
+            const logsContainer = document.getElementById('logs-container');
+            
+            // Update filter buttons
+            document.querySelectorAll('.log-filter').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Clear and re-render logs
+            logsContainer.innerHTML = '';
+            
+            const filteredLogs = filter === 'all' 
+                ? allLogs 
+                : allLogs.filter(log => log.level === filter);
+            
+            filteredLogs.forEach(log => appendLogEntry(log));
+        }
+
+        function clearLogs() {
+            if (confirm('Clear all logs?')) {
+                allLogs = [];
+                document.getElementById('logs-container').innerHTML = '';
+                addLogToDisplay('Logs cleared', 'info');
+            }
+        }
+
+        function exportLogs() {
+            const logText = allLogs.map(log => 
+                `[${log.timestamp}] ${log.level.toUpperCase()}: ${log.message}`
+            ).join('\n');
+            
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vlsi-scanner-logs-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            addLogToDisplay('Logs exported successfully', 'success');
+        }
+
+        function showNotification(message, type = 'info') {
+            // Simple notification implementation
+            alert(message);
+        }
+
+        function startLogPolling() {
+            setInterval(() => {
+                if (isAdmin && !logsPaused) {
+                    fetch('/api/logs')
+                        .then(r => r.json())
+                        .then(logs => {
+                            const newLogs = logs.slice(logCount);
+                            newLogs.forEach(log => {
+                                const formattedLog = {
+                                    timestamp: log.timestamp.split(' ')[1],
+                                    level: log.level,
+                                    message: log.message
+                                };
+                                allLogs.push(formattedLog);
+                                
+                                if (currentLogFilter === 'all' || currentLogFilter === log.level) {
+                                    appendLogEntry(formattedLog);
+                                }
+                            });
+                            
+                            logCount = logs.length;
+                        })
+                        .catch(e => console.error('Log polling failed:', e));
+                }
+            }, 2000);
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'l') {
+                e.preventDefault();
+                clearLogs();
+            }
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                toggleLogPause();
+            }
+            if (e.ctrlKey && e.key === 'e') {
+                e.preventDefault();
+                exportLogs();
+            }
+        });
+        </script>
+    </body>
+    </html>
+    '''
+    return render_template_string(template)
+
+@app.route('/api/auth', methods=['POST'])
+def api_auth():
+    """Admin authentication"""
+    data = request.get_json()
+    password = data.get('password', '')
+    
+    if password == ADMIN_PASSWORD:
+        session['admin_authenticated'] = True
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False})
+
+@app.route('/api/setup-gmail', methods=['POST'])
+@admin_required
+def api_setup_gmail():
+    """Setup Gmail API authentication"""
+    try:
+        data = request.get_json() or {}
+        user_email = data.get('user_email')
+        
+        if not GOOGLE_APIS_AVAILABLE:
+            return jsonify({'status': 'error', 'message': 'Google API libraries not available'})
+        
+        if scanner.authenticate_google_apis(user_email):
+            if scanner.setup_drive_folders():
+                return jsonify({'status': 'success', 'message': 'Gmail integration setup completed'})
+            else:
+                return jsonify({'status': 'error', 'message': 'Drive folder setup failed'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Gmail authentication failed'})
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Setup failed: {str(e)}'})
+
+@app.route('/api/oauth-code', methods=['POST'])
+@admin_required
+def api_oauth_code():
+    """Submit OAuth authorization code"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No data received'})
+            
+        auth_code = data.get('code', '').strip()
+        if not auth_code:
+            return jsonify({'status': 'error', 'message': 'Authorization code is required'})
+        
+        if not hasattr(scanner, '_oauth_flow') or not scanner._oauth_flow:
+            return jsonify({'status': 'error', 'message': 'OAuth flow not found. Please restart Gmail setup.'})
+        
+        try:
+            # Exchange code for credentials
+            scanner._oauth_flow.fetch_token(code=auth_code)
+            creds = scanner._oauth_flow.credentials
+            
+            # Save credentials
+            try:
+                temp_gmail_service = build('gmail', 'v1', credentials=creds)
+                profile = temp_gmail_service.users().getProfile(userId='me').execute()
+                user_email = profile.get('emailAddress')
+                
+                if user_email:
+                    token_filename = f'token_{user_email.replace("@", "_").replace(".", "_")}.json'
+                    with open(token_filename, 'w') as token:
+                        token.write(creds.to_json())
+                    scanner.add_log(f"💾 Saved token for {user_email}", 'success')
+                    
+                with open('token.json', 'w') as token:
+                    token.write(creds.to_json())
+                    
+            except Exception as e:
+                scanner.add_log(f"⚠️ Could not save token: {e}", 'warning')
+            
+            # Initialize services
+            scanner.credentials = creds
+            if scanner._test_credentials():
+                if scanner.setup_drive_folders():
+                    scanner._oauth_flow = None
+                    return jsonify({'status': 'success', 'message': 'OAuth authentication completed successfully'})
+                else:
+                    return jsonify({'status': 'error', 'message': 'Drive folder setup failed'})
+            else:
+                return jsonify({'status': 'error', 'message': 'Credential verification failed'})
+            
+        except Exception as e:
+            error_str = str(e).lower()
+            if "invalid_grant" in error_str:
+                scanner.add_log("💡 Authorization code may have expired", 'warning')
+            return jsonify({'status': 'error', 'message': f'Failed to exchange code: {str(e)}'})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'OAuth submission failed: {str(e)}'})
+
+@app.route('/api/users')
+@admin_required
+def api_users():
+    """Get list of authenticated users"""
+    try:
+        users = list(scanner.user_credentials.keys())
+        if scanner.current_user_email and scanner.current_user_email not in users:
+            users.append(scanner.current_user_email)
+        return jsonify({'users': users})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+@app.route('/api/scan-gmail', methods=['POST'])
+@admin_required
+def api_scan_gmail():
+    """Full Gmail scan"""
+    result = scanner.scan_emails()
+    return jsonify(result)
+
+@app.route('/api/stop-scan', methods=['POST'])
+@admin_required
+def api_stop_scan():
+    """Stop ongoing scan"""
+    # This would need implementation in the scanner class
+    # For now, return success
+    return jsonify({'status': 'success', 'message': 'Scan stop requested'})
+
+@app.route('/api/quick-scan', methods=['POST'])
+@admin_required
+def api_quick_scan():
+    """Quick Gmail scan"""
+    result = scanner.scan_emails(max_results=50)
+    return jsonify(result)
+
+@app.route('/api/test-system', methods=['POST'])
+@admin_required
+def api_test_system():
+    """Test system components"""
+    status = scanner.get_system_status()
+    return jsonify(status)
+
+@app.route('/api/status')
+@admin_required
+def api_status():
+    """Get system status"""
+    return jsonify(scanner.get_system_status())
+
+@app.route('/api/logs')
+@admin_required
+def api_logs():
+    """Get recent logs"""
+    return jsonify(scanner.logs)
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)                temp_file.write(doc_data)
+                temp_file_path = temp_file.name
+            
+            try:
+                doc = Document(temp_file_path)
+                text = ""
+                for paragraph in doc.paragraphs:
+                    text += paragraph.text + "\n"
+                return text
+            finally:
+                os.unlink(temp_file_path)
+                
+        except Exception as e:
+            self.add_log(f"❌ DOCX extraction failed: {e}", 'error')
+            return ""
+
+    def extract_doc_text(self, doc_data: bytes, filename: str) -> str:
+        """Extract text from DOC"""
+        try:
+            if not DOC_PROCESSING_AVAILABLE:
+                return ""
+            
+            with tempfile.NamedTemporaryFile(suffix='.doc', delete=False) as temp_file:
+                temp_file.write(doc_data)
+                temp_file_path = temp_file.name
+            
+            try:
+                import docx2txt
+                text = docx2txt.process(temp_file_path)
+                return text
+            finally:
+                os.unlink(temp_file_path)
+                
+        except Exception as e:
+            self.add_log(f"❌ DOC extraction failed: {e}", 'error')
+            return ""
+
+    def save_to_drive(self, file_data: bytes, filename: str, metadata: Dict) -> Optional[str]:
+        """Save file to Google Drive with domain and experience organization"""
+        try:
+            if not self.drive_service:
+                return None
+            
+            analysis = metadata.get('analysis_result', {})
+            domain = analysis.get('domain', 'Unknown Domain')
+            experience_level = analysis.get('experience_level', 'Unknown')
+            experience_years = analysis.get('experience_years', 0)
+            
+            # Get domain folder
+            domain_folder_id = self.domain_folders.get(domain, self.domain_folders.get('Unknown Domain'))
+            
+            # Find experience subfolder
+            exp_folder_query = f"name='{experience_level}' and parents in '{domain_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            exp_results = self.drive_service.files().list(q=exp_folder_query, fields="files(id, name)").execute()
+            
+            if exp_results.get('files'):
+                target_folder_id = exp_results['files'][0]['id']
+            else:
+                # Create experience subfolder
+                exp_metadata = {
+                    'name': experience_level,
+                    'parents': [domain_folder_id],
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                exp_folder = self.drive_service.files().create(body=exp_metadata, fields='id').execute()
+                target_folder_id = exp_folder.get('id')
+            
+            # Create enhanced filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            file_extension = filename.split('.')[-1].lower()
+            clean_filename = filename.replace(f'.{file_extension}', '')
+            
+            domain_abbrev = {
+                'Physical Design': 'PD', 'Design Verification': 'DV', 'DFT': 'DFT',
+                'RTL Design': 'RTL', 'Analog Design': 'ANA', 'FPGA': 'FPGA',
+                'Silicon Validation': 'SiVal', 'Mixed Signal': 'MS',
+                'General VLSI': 'VLSI', 'Unknown Domain': 'UNK'
+            }.get(domain, 'UNK')
+            
+            exp_abbrev = {
+                'Fresher (0-2 years)': 'FR', 'Mid-Level (2-5 years)': 'ML',
+                'Senior (5-8 years)': 'SR', 'Experienced (8+ years)': 'EX'
+            }.get(experience_level, 'UK')
+            
+            new_filename = f"[{domain_abbrev}_{exp_abbrev}_{experience_years}Y] {timestamp}_{clean_filename}.{file_extension}"
+            
+            file_metadata = {
+                'name': new_filename,
+                'parents': [target_folder_id],
+                'description': f"""VLSI Resume Scanner Analysis
+
+Email: {metadata.get('sender', 'Unknown')}
+Subject: {metadata.get('subject', 'No subject')}
+Date: {metadata.get('date', 'Unknown')}
+
+Domain: {domain}
+Experience: {experience_level} ({experience_years} years)
+Score: {analysis.get('resume_score', 0):.2f}
+
+Auto-filed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Location: {domain} > {experience_level}"""
+            }
+            
+            # Upload file
+            mime_types = {
+                'pdf': 'application/pdf',
+                'doc': 'application/msword',
+                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            }
+            mime_type = mime_types.get(file_extension, 'application/octet-stream')
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
+                temp_file.write(file_data)
+                temp_file_path = temp_file.name
+            
+            try:
+                from googleapiclient.http import MediaFileUpload
+                media = MediaFileUpload(temp_file_path, mimetype=mime_type)
+                file = self.drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id'
+                ).execute()
+                
+                file_id = file.get('id')
+                self.add_log(f"💾 Saved: {domain}/{experience_level} - {filename}", 'success')
+                return file_id
+                
+            finally:
+                os.unlink(temp_file_path)
+            
+        except Exception as e:
+            self.add_log(f"❌ Save failed for {filename}: {e}", 'error')
+            return None
+
+    def get_system_status(self) -> Dict[str, Any]:
+        """Get current system status"""
+        return {
+            'google_apis_available': GOOGLE_APIS_AVAILABLE,
+            'pdf_processing_available': PDF_PROCESSING_AVAILABLE,
+            'docx_processing_available': DOCX_PROCESSING_AVAILABLE,
+            'doc_processing_available': DOC_PROCESSING_AVAILABLE,
+            'credentials_file_exists': os.path.exists('credentials.json'),
+            'token_file_exists': os.path.exists('token.json'),
+            'gmail_service_active': self.gmail_service is not None,
+            'drive_service_active': self.drive_service is not None,
+            'env_client_id': bool(os.environ.get('GOOGLE_CLIENT_ID')),
+            'env_client_secret': bool(os.environ.get('GOOGLE_CLIENT_SECRET')),
+            'env_project_id': bool(os.environ.get('GOOGLE_PROJECT_ID')),
+            'current_user': self.current_user_email,
+            'authenticated_users': list(self.user_credentials.keys()),
+            'stats': self.stats,
+            'recent_logs': self.logs[-10:] if self.logs else []
+        }
+
+# Initialize scanner
+scanner = VLSIResumeScanner()
+
+def admin_required(f):
+    """Decorator to require admin authentication"""
+    def wrapper(*args, **kwargs):
+        if not session.get('admin_authenticated'):
+            return jsonify({'error': 'Admin authentication required'}), 401
+        return f(*args, **kwargs)
+    wrapper.__name__ = f.__name__
+    return wrapper
+
 @app.route('/')
 def index():
     """Main dashboard"""
@@ -704,111 +1730,7 @@ def index():
                     <div class="stat-card">
                         <div class="stat-label">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                            </svg>
-                            Processing Errors
-                        </div>
-                        <div class="stat-value" id="errors-count">0</div>
-                    </div>
-                </div>
-
-                <div class="controls-section">
-                    <div class="controls-header">
-                        <h2>Scanner Controls</h2>
-                        <div id="scan-status"></div>
-                    </div>
-                    <div class="controls-grid">
-                        <button onclick="setupGmail()" class="btn btn-info">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-                            </svg>
-                            Setup Gmail
-                        </button>
-                        <button id="scan-btn" onclick="handleScan()" class="btn btn-primary">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-                            </svg>
-                            Full Scan
-                        </button>
-                        <button onclick="quickScan()" class="btn btn-success">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                            </svg>
-                            Quick Scan
-                        </button>
-                        <button onclick="testSystem()" class="btn btn-secondary">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
-                            </svg>
-                            Test System
-                        </button>
-                        <button onclick="showUserManager()" class="btn btn-warning">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
-                            </svg>
-                            Team Access
-                        </button>
-                        <button onclick="exportLogs()" class="btn btn-outline">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                            </svg>
-                            Export Logs
-                        </button>
-                    </div>
-                </div>
-
-                <div class="status-grid">
-                    <div class="status-card">
-                        <h3>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-                            </svg>
-                            System Status
-                        </h3>
-                        <div id="system-status">
-                            <div class="status-item">
-                                <span>Loading...</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="status-card">
-                        <h3>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="11" width="18" height="10" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
-                            </svg>
-                            Authentication Status
-                        </h3>
-                        <div id="auth-status">
-                            <div class="status-item">
-                                <span>Loading...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="logs-container">
-                    <div class="logs-header">
-                        <h3>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-                            </svg>
-                            Activity Logs
-                        </h3>
-                        <div class="logs-controls">
-                            <button class="log-filter active" onclick="filterLogs('all')">All</button>
-                            <button class="log-filter" onclick="filterLogs('error')">Errors</button>
-                            <button class="log-filter" onclick="filterLogs('warning')">Warnings</button>
-                            <button class="log-filter" onclick="filterLogs('success')">Success</button>
-                            <button class="btn btn-outline" onclick="toggleLogPause()" id="pause-btn">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-                                </svg>
-                                Pause
-                            </button>
-                            <button class="btn btn-outline" onclick="clearLogs()">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h#!/usr/bin/env python3
+                                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """VLSI Resume Scanner v2.1 - Professional Edition"""
 
@@ -1394,6 +2316,7 @@ class VLSIResumeScanner:
             
             # Enhanced experience level detection
             experience_years = 0
+            # Use raw strings for all regex patterns
             year_patterns = [
                 r'(\d+\.?\d*)\s*\+?\s*(?:years?|yrs?)\s*(?:of\s*)?(?:experience|exp)',
                 r'experience\s*:?\s*(\d+\.?\d*)\s*\+?\s*(?:years?|yrs?)',
@@ -1407,13 +2330,19 @@ class VLSIResumeScanner:
                 for match in matches:
                     if isinstance(match, tuple):
                         # Handle "X years Y months" pattern
-                        if len(match) == 2 and match[0].isdigit() and match[1].isdigit():
-                            years = float(match[0]) + float(match[1]) / 12
-                            experience_years = max(experience_years, years)
+                        if len(match) == 2:
+                            try:
+                                years = float(match[0]) + float(match[1]) / 12
+                                experience_years = max(experience_years, years)
+                            except (ValueError, TypeError):
+                                pass
                     else:
-                        years = float(match)
-                        if 0 < years < 50:  # Sanity check
-                            experience_years = max(experience_years, years)
+                        try:
+                            years = float(match)
+                            if 0 < years < 50:  # Sanity check
+                                experience_years = max(experience_years, years)
+                        except (ValueError, TypeError):
+                            pass
             
             # Check for fresher indicators if no experience found
             if experience_years == 0:
@@ -1488,1331 +2417,4 @@ class VLSIResumeScanner:
                 return ""
             
             with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as temp_file:
-                temp_file.write(doc_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                doc = Document(temp_file_path)
-                text = ""
-                for paragraph in doc.paragraphs:
-                    text += paragraph.text + "\n"
-                return text
-            finally:
-                os.unlink(temp_file_path)
-                
-        except Exception as e:
-            self.add_log(f"❌ DOCX extraction failed: {e}", 'error')
-            return ""
-
-    def extract_doc_text(self, doc_data: bytes, filename: str) -> str:
-        """Extract text from DOC"""
-        try:
-            if not DOC_PROCESSING_AVAILABLE:
-                return ""
-            
-            with tempfile.NamedTemporaryFile(suffix='.doc', delete=False) as temp_file:
-                temp_file.write(doc_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                import docx2txt
-                text = docx2txt.process(temp_file_path)
-                return text
-            finally:
-                os.unlink(temp_file_path)
-                
-        except Exception as e:
-            self.add_log(f"❌ DOC extraction failed: {e}", 'error')
-            return ""
-
-    def save_to_drive(self, file_data: bytes, filename: str, metadata: Dict) -> Optional[str]:
-        """Save file to Google Drive with domain and experience organization"""
-        try:
-            if not self.drive_service:
-                return None
-            
-            analysis = metadata.get('analysis_result', {})
-            domain = analysis.get('domain', 'Unknown Domain')
-            experience_level = analysis.get('experience_level', 'Unknown')
-            experience_years = analysis.get('experience_years', 0)
-            
-            # Get domain folder
-            domain_folder_id = self.domain_folders.get(domain, self.domain_folders.get('Unknown Domain'))
-            
-            # Find experience subfolder
-            exp_folder_query = f"name='{experience_level}' and parents in '{domain_folder_id}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-            exp_results = self.drive_service.files().list(q=exp_folder_query, fields="files(id, name)").execute()
-            
-            if exp_results.get('files'):
-                target_folder_id = exp_results['files'][0]['id']
-            else:
-                # Create experience subfolder
-                exp_metadata = {
-                    'name': experience_level,
-                    'parents': [domain_folder_id],
-                    'mimeType': 'application/vnd.google-apps.folder'
-                }
-                exp_folder = self.drive_service.files().create(body=exp_metadata, fields='id').execute()
-                target_folder_id = exp_folder.get('id')
-            
-            # Create enhanced filename
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            file_extension = filename.split('.')[-1].lower()
-            clean_filename = filename.replace(f'.{file_extension}', '')
-            
-            domain_abbrev = {
-                'Physical Design': 'PD', 'Design Verification': 'DV', 'DFT': 'DFT',
-                'RTL Design': 'RTL', 'Analog Design': 'ANA', 'FPGA': 'FPGA',
-                'Silicon Validation': 'SiVal', 'Mixed Signal': 'MS',
-                'General VLSI': 'VLSI', 'Unknown Domain': 'UNK'
-            }.get(domain, 'UNK')
-            
-            exp_abbrev = {
-                'Fresher (0-2 years)': 'FR', 'Mid-Level (2-5 years)': 'ML',
-                'Senior (5-8 years)': 'SR', 'Experienced (8+ years)': 'EX'
-            }.get(experience_level, 'UK')
-            
-            new_filename = f"[{domain_abbrev}_{exp_abbrev}_{experience_years}Y] {timestamp}_{clean_filename}.{file_extension}"
-            
-            file_metadata = {
-                'name': new_filename,
-                'parents': [target_folder_id],
-                'description': f"""VLSI Resume Scanner Analysis
-
-Email: {metadata.get('sender', 'Unknown')}
-Subject: {metadata.get('subject', 'No subject')}
-Date: {metadata.get('date', 'Unknown')}
-
-Domain: {domain}
-Experience: {experience_level} ({experience_years} years)
-Score: {analysis.get('resume_score', 0):.2f}
-
-Auto-filed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-Location: {domain} > {experience_level}"""
-            }
-            
-            # Upload file
-            mime_types = {
-                'pdf': 'application/pdf',
-                'doc': 'application/msword',
-                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            }
-            mime_type = mime_types.get(file_extension, 'application/octet-stream')
-            
-            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
-                temp_file.write(file_data)
-                temp_file_path = temp_file.name
-            
-            try:
-                from googleapiclient.http import MediaFileUpload
-                media = MediaFileUpload(temp_file_path, mimetype=mime_type)
-                file = self.drive_service.files().create(
-                    body=file_metadata,
-                    media_body=media,
-                    fields='id'
-                ).execute()
-                
-                file_id = file.get('id')
-                self.add_log(f"💾 Saved: {domain}/{experience_level} - {filename}", 'success')
-                return file_id
-                
-            finally:
-                os.unlink(temp_file_path)
-            
-        except Exception as e:
-            self.add_log(f"❌ Save failed for {filename}: {e}", 'error')
-            return None
-
-    def get_system_status(self) -> Dict[str, Any]:
-        """Get current system status"""
-        return {
-            'google_apis_available': GOOGLE_APIS_AVAILABLE,
-            'pdf_processing_available': PDF_PROCESSING_AVAILABLE,
-            'docx_processing_available': DOCX_PROCESSING_AVAILABLE,
-            'doc_processing_available': DOC_PROCESSING_AVAILABLE,
-            'credentials_file_exists': os.path.exists('credentials.json'),
-            'token_file_exists': os.path.exists('token.json'),
-            'gmail_service_active': self.gmail_service is not None,
-            'drive_service_active': self.drive_service is not None,
-            'env_client_id': bool(os.environ.get('GOOGLE_CLIENT_ID')),
-            'env_client_secret': bool(os.environ.get('GOOGLE_CLIENT_SECRET')),
-            'env_project_id': bool(os.environ.get('GOOGLE_PROJECT_ID')),
-            'current_user': self.current_user_email,
-            'authenticated_users': list(self.user_credentials.keys()),
-            'stats': self.stats,
-            'recent_logs': self.logs[-10:] if self.logs else []
-        }
-
-# Initialize scanner
-scanner = VLSIResumeScanner()
-
-def admin_required(f):
-    """Decorator to require admin authentication"""
-    def wrapper(*args, **kwargs):
-        if not session.get('admin_authenticated'):
-            return jsonify({'error': 'Admin authentication required'}), 401
-        return f(*args, **kwargs)
-    wrapper.__name__ = f.__name__
-    return wrapper
-
-                                    <path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                                </svg>
-                                Clear
-                            </button>
-                        </div>
-                    </div>
-                    <div class="logs-section" id="logs-container">
-                        <div class="log-entry info">
-                            <span class="log-timestamp">00:00:00</span>
-                            <span class="log-level">Info</span>
-                            <span class="log-message">System initialized. Ready to scan resumes...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- User Manager Modal -->
-        <div id="user-manager-modal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>👥 Team Member Management</h3>
-                    <button class="close-btn" onclick="hideUserManager()">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p style="color: var(--text-secondary); margin-bottom: 20px;">
-                        Add team members to allow them to authenticate with their Gmail accounts.
-                    </p>
-                    <div class="input-group">
-                        <label for="user-email-input">Email Address</label>
-                        <input type="email" id="user-email-input" placeholder="team-member@gmail.com">
-                    </div>
-                    <button onclick="authenticateUser()" class="btn btn-primary btn-full">
-                        Add Team Member
-                    </button>
-                    <div style="margin-top: 24px;">
-                        <h4 style="margin-bottom: 12px;">Authenticated Users</h4>
-                        <div id="user-list" style="background: var(--light); border-radius: 8px; padding: 16px;">
-                            Loading...
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button onclick="hideUserManager()" class="btn btn-outline">Close</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- OAuth Input Modal -->
-        <div id="oauth-modal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>🔑 OAuth Authorization Required</h3>
-                    <button class="close-btn" onclick="hideOAuthInput()">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="oauth-notice">
-                        <strong>⚠️ Action Required:</strong> Please complete the Google authorization process by following the URL in the logs above, then enter the authorization code below.
-                    </div>
-                    <div class="input-group">
-                        <label for="oauth-code-input">Authorization Code</label>
-                        <input type="text" id="oauth-code-input" placeholder="4/1AUJR-x7uuwO5w4uilFkKhvWFzrd99..." style="font-family: monospace;">
-                    </div>
-                    <button onclick="submitOAuthCode()" class="btn btn-success btn-full">
-                        Submit Authorization Code
-                    </button>
-                </div>
-                <div class="modal-footer">
-                    <button onclick="hideOAuthInput()" class="btn btn-outline">Cancel</button>
-                </div>
-            </div>
-        </div>
-
-        <script>
-        let isAdmin = false;
-        let logCount = 0;
-        let isScanning = false;
-        let scanAbortController = null;
-        let logsPaused = false;
-        let currentLogFilter = 'all';
-        let allLogs = [];
-
-        function authenticate(event) {
-            event.preventDefault();
-            const password = document.getElementById('admin-password').value;
-            
-            fetch('/api/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: password })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    isAdmin = true;
-                    document.getElementById('auth-section').style.display = 'none';
-                    document.getElementById('main-content').style.display = 'block';
-                    loadSystemStatus();
-                    startLogPolling();
-                } else {
-                    showNotification('Invalid password', 'error');
-                }
-            });
-        }
-
-        function setupGmail() {
-            if (!isAdmin) return;
-            addLogToDisplay('Starting Gmail API setup...', 'info');
-            
-            fetch('/api/setup-gmail', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        addLogToDisplay(data.message, 'success');
-                        hideOAuthInput();
-                    } else {
-                        addLogToDisplay(data.message, 'error');
-                        if (data.message.includes('authentication failed')) {
-                            setTimeout(showOAuthInput, 1000);
-                        }
-                    }
-                })
-                .catch(e => {
-                    addLogToDisplay('Setup failed: ' + e.message, 'error');
-                });
-        }
-
-        function showOAuthInput() {
-            document.getElementById('oauth-modal').style.display = 'block';
-        }
-
-        function hideOAuthInput() {
-            document.getElementById('oauth-modal').style.display = 'none';
-            document.getElementById('oauth-code-input').value = '';
-        }
-
-        function submitOAuthCode() {
-            const code = document.getElementById('oauth-code-input').value.trim();
-            
-            if (!code) {
-                showNotification('Please enter the authorization code', 'error');
-                return;
-            }
-            
-            addLogToDisplay('Submitting authorization code...', 'info');
-            
-            fetch('/api/oauth-code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: code })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    addLogToDisplay(data.message, 'success');
-                    hideOAuthInput();
-                } else {
-                    addLogToDisplay(data.message, 'error');
-                }
-            })
-            .catch(e => {
-                addLogToDisplay('Code submission failed: ' + e.message, 'error');
-            });
-        }
-
-        function showUserManager() {
-            document.getElementById('user-manager-modal').style.display = 'block';
-            loadAuthenticatedUsers();
-        }
-
-        function hideUserManager() {
-            document.getElementById('user-manager-modal').style.display = 'none';
-        }
-
-        function authenticateUser() {
-            const email = document.getElementById('user-email-input').value.trim();
-            
-            if (!email || !email.includes('@')) {
-                showNotification('Please enter a valid email address', 'error');
-                return;
-            }
-            
-            addLogToDisplay(`Starting authentication for ${email}...`, 'info');
-            
-            fetch('/api/setup-gmail', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_email: email })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    addLogToDisplay(data.message, 'success');
-                    hideOAuthInput();
-                    hideUserManager();
-                } else {
-                    addLogToDisplay(data.message, 'error');
-                    if (data.message.includes('authentication failed')) {
-                        setTimeout(showOAuthInput, 1000);
-                    }
-                }
-            })
-            .catch(e => {
-                addLogToDisplay('Authentication failed: ' + e.message, 'error');
-            });
-        }
-
-        function loadAuthenticatedUsers() {
-            fetch('/api/users')
-            .then(r => r.json())
-            .then(data => {
-                const userList = document.getElementById('user-list');
-                if (data.users && data.users.length > 0) {
-                    userList.innerHTML = data.users.map(user => 
-                        `<div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
-                            <span style="color: var(--success);">✓</span> ${user}
-                        </div>`
-                    ).join('');
-                } else {
-                    userList.innerHTML = '<div style="color: var(--text-secondary); font-style: italic;">No authenticated users yet</div>';
-                }
-            })
-            .catch(e => {
-                document.getElementById('user-list').innerHTML = '<div style="color: var(--danger);">Error loading users</div>';
-            });
-        }
-
-        function handleScan() {
-            if (isScanning) {
-                stopScan();
-            } else {
-                scanGmail();
-            }
-        }
-
-        function scanGmail() {
-            if (!isAdmin) return;
-            
-            isScanning = true;
-            updateScanButton();
-            addLogToDisplay('Starting full Gmail scan...', 'info');
-            
-            scanAbortController = new AbortController();
-            
-            fetch('/api/scan-gmail', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({}),
-                signal: scanAbortController.signal
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        addLogToDisplay(`Scan completed: ${data.processed} emails processed, ${data.resumes_found} resumes found`, 'success');
-                        updateStats(data.stats);
-                    } else {
-                        addLogToDisplay(data.error, 'error');
-                    }
-                })
-                .catch(e => {
-                    if (e.name !== 'AbortError') {
-                        addLogToDisplay('Scan failed: ' + e.message, 'error');
-                    }
-                })
-                .finally(() => {
-                    isScanning = false;
-                    updateScanButton();
-                });
-        }
-
-        function stopScan() {
-            if (scanAbortController) {
-                scanAbortController.abort();
-                addLogToDisplay('Scan stopped by user', 'warning');
-            }
-            isScanning = false;
-            updateScanButton();
-        }
-
-        function updateScanButton() {
-            const btn = document.getElementById('scan-btn');
-            if (isScanning) {
-                btn.innerHTML = `
-                    <div class="scanning">
-                        <div class="spinner"></div>
-                        Stop Scan
-                    </div>
-                `;
-                btn.classList.remove('btn-primary');
-                btn.classList.add('btn-danger');
-            } else {
-                btn.innerHTML = `
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                    Full Scan
-                `;
-                btn.classList.remove('btn-danger');
-                btn.classList.add('btn-primary');
-            }
-        }
-
-        function quickScan() {
-            if (!isAdmin) return;
-            addLogToDisplay('Starting quick scan (last 50 emails)...', 'info');
-            
-            fetch('/api/quick-scan', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        addLogToDisplay(`Quick scan completed: ${data.processed} emails processed, ${data.resumes_found} resumes found`, 'success');
-                        updateStats(data.stats);
-                    } else {
-                        addLogToDisplay(data.error, 'error');
-                    }
-                })
-                .catch(e => {
-                    addLogToDisplay('Quick scan failed: ' + e.message, 'error');
-                });
-        }
-
-        function testSystem() {
-            if (!isAdmin) return;
-            addLogToDisplay('Running system diagnostics...', 'info');
-            
-            fetch('/api/test-system', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-            })
-                .then(r => r.json())
-                .then(data => {
-                    addLogToDisplay('System diagnostics completed', 'info');
-                    loadSystemStatus();
-                })
-                .catch(e => {
-                    addLogToDisplay('System test failed: ' + e.message, 'error');
-                });
-        }
-
-        function loadSystemStatus() {
-            if (!isAdmin) return;
-            
-            fetch('/api/status')
-                .then(r => r.json())
-                .then(data => {
-                    updateSystemStatus(data);
-                    updateStats(data.stats);
-                })
-                .catch(e => {
-                    console.error('Failed to load status:', e);
-                });
-        }
-
-        function updateSystemStatus(data) {
-            const systemStatus = document.getElementById('system-status');
-            const authStatus = document.getElementById('auth-status');
-            
-            systemStatus.innerHTML = `
-                <div class="status-item">
-                    <span>Google APIs</span>
-                    <span class="status-value ${data.google_apis_available ? 'success' : 'error'}">
-                        ${data.google_apis_available ? '✅ Available' : '❌ Missing'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>PDF Processing</span>
-                    <span class="status-value ${data.pdf_processing_available ? 'success' : 'error'}">
-                        ${data.pdf_processing_available ? '✅ Available' : '❌ Missing'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>DOC Processing</span>
-                    <span class="status-value ${data.docx_processing_available || data.doc_processing_available ? 'success' : 'error'}">
-                        ${data.docx_processing_available || data.doc_processing_available ? '✅ Available' : '❌ Missing'}
-                    </span>
-                </div>
-            `;
-            
-            authStatus.innerHTML = `
-                <div class="status-item">
-                    <span>Gmail Service</span>
-                    <span class="status-value ${data.gmail_service_active ? 'success' : 'error'}">
-                        ${data.gmail_service_active ? '✅ Active' : '❌ Inactive'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>Drive Service</span>
-                    <span class="status-value ${data.drive_service_active ? 'success' : 'error'}">
-                        ${data.drive_service_active ? '✅ Active' : '❌ Inactive'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>Current User</span>
-                    <span class="status-value ${data.current_user ? 'success' : 'warning'}">
-                        ${data.current_user || 'Not authenticated'}
-                    </span>
-                </div>
-            `;
-        }
-
-        function updateStats(stats) {
-            if (stats) {
-                document.getElementById('total-emails').textContent = stats.total_emails || 0;
-                document.getElementById('resumes-found').textContent = stats.resumes_found || 0;
-                document.getElementById('errors-count').textContent = stats.processing_errors || 0;
-                
-                if (stats.last_scan_time) {
-                    const lastScan = new Date(stats.last_scan_time);
-                    document.getElementById('last-scan').textContent = formatDate(lastScan);
-                }
-            }
-        }
-
-        function formatDate(date) {
-            const now = new Date();
-            const diff = now - date;
-            
-            if (diff < 60000) return 'Just now';
-            if (diff < 3600000) return Math.floor(diff / 60000) + ' mins ago';
-            if (diff < 86400000) return Math.floor(diff / 3600000) + ' hours ago';
-            
-            return date.toLocaleDateString();
-        }
-
-        function addLogToDisplay(message, level = 'info') {
-            const timestamp = new Date().toLocaleTimeString('en-US', { 
-                hour12: false,
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-            
-            const logEntry = {
-                timestamp,
-                level,
-                message
-            };
-            
-            allLogs.push(logEntry);
-            
-            if (!logsPaused && (currentLogFilter === 'all' || currentLogFilter === level)) {
-                appendLogEntry(logEntry);
-            }
-        }
-
-        function appendLogEntry(log) {
-            const logsContainer = document.getElementById('logs-container');
-            const logDiv = document.createElement('div');
-            logDiv.className = `log-entry ${log.level}`;
-            
-                        logDiv.innerHTML = `
-                <span class="log-timestamp">${log.timestamp}</span>
-                <span class="log-level">${log.level}</span>
-                <span class="log-message">${log.message}</span>
-            `;
-            
-            logsContainer.appendChild(logDiv);
-            
-            if (!logsPaused) {
-                logsContainer.scrollTop = logsContainer.scrollHeight;
-            }
-            
-            while (logsContainer.children.length > 200) {
-                logsContainer.removeChild(logsContainer.firstChild);
-            }
-        }
-
-        function toggleLogPause() {
-            logsPaused = !logsPaused;
-            const pauseBtn = document.getElementById('pause-btn');
-            const logsContainer = document.getElementById('logs-container');
-            
-            if (logsPaused) {
-                pauseBtn.innerHTML = `
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="5 3 19 12 5 21 5 3"/>
-                    </svg>
-                    Resume
-                `;
-                logsContainer.classList.add('paused');
-            } else {
-                pauseBtn.innerHTML = `
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-                    </svg>
-                    Pause
-                `;
-                logsContainer.classList.remove('paused');
-                logsContainer.scrollTop = logsContainer.scrollHeight;
-            }
-        }
-
-        function filterLogs(filter) {
-            currentLogFilter = filter;
-            const logsContainer = document.getElementById('logs-container');
-            
-            // Update filter buttons
-            document.querySelectorAll('.log-filter').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            // Clear and re-render logs
-            logsContainer.innerHTML = '';
-            
-            const filteredLogs = filter === 'all' 
-                ? allLogs 
-                : allLogs.filter(log => log.level === filter);
-            
-            filteredLogs.forEach(log => appendLogEntry(log));
-        }
-
-        function clearLogs() {
-            if (confirm('Clear all logs?')) {
-                allLogs = [];
-                document.getElementById('logs-container').innerHTML = '';
-                addLogToDisplay('Logs cleared', 'info');
-            }
-        }
-
-        function exportLogs() {
-            const logText = allLogs.map(log => 
-                `[${log.timestamp}] ${log.level.toUpperCase()}: ${log.message}`
-            ).join('\n');
-            
-            const blob = new Blob([logText], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `vlsi-scanner-logs-${new Date().toISOString().split('T')[0]}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            addLogToDisplay('Logs exported successfully', 'success');
-        }
-
-        function showNotification(message, type = 'info') {
-            // Simple notification implementation
-            alert(message);
-        }
-
-        function startLogPolling() {
-            setInterval(() => {
-                if (isAdmin && !logsPaused) {
-                    fetch('/api/logs')
-                        .then(r => r.json())
-                        .then(logs => {
-                            const newLogs = logs.slice(logCount);
-                            newLogs.forEach(log => {
-                                const formattedLog = {
-                                    timestamp: log.timestamp.split(' ')[1],
-                                    level: log.level,
-                                    message: log.message
-                                };
-                                allLogs.push(formattedLog);
-                                
-                                if (currentLogFilter === 'all' || currentLogFilter === log.level) {
-                                    appendLogEntry(formattedLog);
-                                }
-                            });
-                            
-                            logCount = logs.length;
-                        })
-                        .catch(e => console.error('Log polling failed:', e));
-                }
-            }, 2000);
-        }
-
-        // Close modals when clicking outside
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.style.display = 'none';
-            }
-        }
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.key === 'l') {
-                e.preventDefault();
-                clearLogs();
-            }
-            if (e.ctrlKey && e.key === 'p') {
-                e.preventDefault();
-                toggleLogPause();
-            }
-            if (e.ctrlKey && e.key === 'e') {
-                e.preventDefault();
-                exportLogs();
-            }
-        });
-        </script>
-    </body>
-    </html>
-    '''
-    return render_template_string(template) 0;">
-                            Team members can authenticate with their own Gmail accounts for personalized access.
-                        </p>
-                        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
-                            <input type="email" id="user-email-input" placeholder="team-member@gmail.com" 
-                                   style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-                            <button onclick="authenticateUser()" style="padding: 10px 20px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                Add Team Member
-                            </button>
-                        </div>
-                        <div id="authenticated-users" style="background: white; border-radius: 4px; padding: 10px;">
-                            <strong>Authenticated Users:</strong>
-                            <div id="user-list">Loading...</div>
-                        </div>
-                        <button onclick="hideUserManager()" style="margin-top: 10px; padding: 8px 16px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Close
-                        </button>
-                    </div>
-
-                    <div id="oauth-input" style="display: none; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                        <h3 style="color: #856404; margin: 0 0 15px 0;">🔑 OAuth Authorization Required</h3>
-                        <p style="color: #856404; margin: 0 0 15px 0;">
-                            Click the authorization URL in the logs above, complete Google authorization, then enter the code you receive:
-                        </p>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="text" id="oauth-code-input" placeholder="4/1AUJR-x7uuwO5w4uilFkKhvWFzrd99..." 
-                                   style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;">
-                            <button onclick="submitOAuthCode()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                Submit Code
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="status-grid">
-                        <div class="status-card">
-                            <h3>🔧 System Status</h3>
-                            <div id="system-status">Loading...</div>
-                        </div>
-                        
-                        <div class="status-card">
-                            <h3>🔑 Authentication</h3>
-                            <div id="auth-status">Loading...</div>
-                        </div>
-                        
-                        <div class="status-card">
-                            <h3>📊 Statistics</h3>
-                            <div id="stats-details">Loading...</div>
-                        </div>
-                    </div>
-
-                    <div class="status-card">
-                        <h3>📋 Activity Logs</h3>
-                        <div class="logs-section" id="logs-container">
-                            <div class="log-entry info">System initialized. Waiting for commands...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <script>
-        let isAdmin = false;
-        let logCount = 0;
-
-        function authenticate() {
-            const password = document.getElementById('admin-password').value;
-            
-            fetch('/api/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: password })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    isAdmin = true;
-                    document.getElementById('auth-section').style.display = 'none';
-                    document.getElementById('main-content').style.display = 'block';
-                    loadSystemStatus();
-                    startLogPolling();
-                } else {
-                    alert('Invalid password');
-                }
-            });
-        }
-
-        function setupGmail() {
-            if (!isAdmin) return;
-            addLogToDisplay('🔧 Starting Gmail API setup...', 'info');
-            
-            fetch('/api/setup-gmail', { 
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({})
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        addLogToDisplay('✅ ' + data.message, 'success');
-                        hideOAuthInput();
-                    } else {
-                        addLogToDisplay('❌ ' + data.message, 'error');
-                        if (data.message.includes('authentication failed')) {
-                            setTimeout(showOAuthInput, 1000);
-                        }
-                    }
-                })
-                .catch(e => {
-                    addLogToDisplay('❌ Setup failed: ' + e.message, 'error');
-                });
-        }
-
-        function showOAuthInput() {
-            document.getElementById('oauth-input').style.display = 'block';
-        }
-
-        function hideOAuthInput() {
-            document.getElementById('oauth-input').style.display = 'none';
-            document.getElementById('oauth-code-input').value = '';
-        }
-
-        function submitOAuthCode() {
-            const code = document.getElementById('oauth-code-input').value.trim();
-            
-            if (!code) {
-                addLogToDisplay('❌ Please enter the authorization code', 'error');
-                return;
-            }
-            
-            addLogToDisplay('🔄 Submitting authorization code...', 'info');
-            
-            fetch('/api/oauth-code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: code })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    addLogToDisplay('✅ ' + data.message, 'success');
-                    hideOAuthInput();
-                } else {
-                    addLogToDisplay('❌ ' + data.message, 'error');
-                }
-            })
-            .catch(e => {
-                addLogToDisplay('❌ Code submission failed: ' + e.message, 'error');
-            });
-        }
-
-        function showUserManager() {
-            document.getElementById('user-manager').style.display = 'block';
-            loadAuthenticatedUsers();
-        }
-
-        function hideUserManager() {
-            document.getElementById('user-manager').style.display = 'none';
-        }
-
-        function authenticateUser() {
-            const email = document.getElementById('user-email-input').value.trim();
-            
-            if (!email || !email.includes('@')) {
-                addLogToDisplay('❌ Please enter a valid email address', 'error');
-                return;
-            }
-            
-            addLogToDisplay(`🔐 Starting authentication for ${email}...`, 'info');
-            
-            fetch('/api/setup-gmail', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_email: email })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    addLogToDisplay('✅ ' + data.message, 'success');
-                    hideOAuthInput();
-                    hideUserManager();
-                } else {
-                    addLogToDisplay('❌ ' + data.message, 'error');
-                    if (data.message.includes('authentication failed')) {
-                        setTimeout(showOAuthInput, 1000);
-                    }
-                }
-            })
-            .catch(e => {
-                addLogToDisplay('❌ Authentication failed: ' + e.message, 'error');
-            });
-        }
-
-        function loadAuthenticatedUsers() {
-            fetch('/api/users')
-            .then(r => r.json())
-            .then(data => {
-                const userList = document.getElementById('user-list');
-                if (data.users && data.users.length > 0) {
-                    userList.innerHTML = data.users.map(user => 
-                        `<div style="padding: 5px 0; border-bottom: 1px solid #eee;">
-                            <span style="color: #2196f3;">✓</span> ${user}
-                        </div>`
-                    ).join('');
-                } else {
-                    userList.innerHTML = '<div style="color: #666; font-style: italic;">No authenticated users yet</div>';
-                }
-            })
-            .catch(e => {
-                document.getElementById('user-list').innerHTML = '<div style="color: #f44336;">Error loading users</div>';
-            });
-        }
-
-        function scanGmail() {
-            if (!isAdmin) return;
-            addLogToDisplay('📧 Starting full Gmail scan...', 'info');
-            
-            fetch('/api/scan-gmail', { 
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({})
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        addLogToDisplay(`✅ Scan completed: ${data.processed} emails processed, ${data.resumes_found} resumes found`, 'success');
-                        updateStats(data.stats);
-                    } else {
-                        addLogToDisplay('❌ ' + data.error, 'error');
-                    }
-                })
-                .catch(e => {
-                    addLogToDisplay('❌ Scan failed: ' + e.message, 'error');
-                });
-        }
-
-        function quickScan() {
-            if (!isAdmin) return;
-            addLogToDisplay('⚡ Starting quick scan (last 50 emails)...', 'info');
-            
-            fetch('/api/quick-scan', { 
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({})
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        addLogToDisplay(`✅ Quick scan completed: ${data.processed} emails processed, ${data.resumes_found} resumes found`, 'success');
-                        updateStats(data.stats);
-                    } else {
-                        addLogToDisplay('❌ ' + data.error, 'error');
-                    }
-                })
-                .catch(e => {
-                    addLogToDisplay('❌ Quick scan failed: ' + e.message, 'error');
-                });
-        }
-
-        function testSystem() {
-            if (!isAdmin) return;
-            addLogToDisplay('🔍 Running system test...', 'info');
-            
-            fetch('/api/test-system', { 
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({})
-            })
-                .then(r => r.json())
-                .then(data => {
-                    addLogToDisplay('📊 System test completed', 'info');
-                    loadSystemStatus();
-                })
-                .catch(e => {
-                    addLogToDisplay('❌ System test failed: ' + e.message, 'error');
-                });
-        }
-
-        function loadSystemStatus() {
-            if (!isAdmin) return;
-            
-            fetch('/api/status')
-                .then(r => r.json())
-                .then(data => {
-                    updateSystemStatus(data);
-                    updateStats(data.stats);
-                })
-                .catch(e => {
-                    console.error('Failed to load status:', e);
-                });
-        }
-
-        function updateSystemStatus(data) {
-            const systemStatus = document.getElementById('system-status');
-            const authStatus = document.getElementById('auth-status');
-            
-            systemStatus.innerHTML = `
-                <div class="status-item">
-                    <span>Google APIs:</span>
-                    <span class="status-value ${data.google_apis_available ? 'success' : 'error'}">
-                        ${data.google_apis_available ? '✅ Available' : '❌ Missing'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>PDF Processing:</span>
-                    <span class="status-value ${data.pdf_processing_available ? 'success' : 'error'}">
-                        ${data.pdf_processing_available ? '✅ Available' : '❌ Missing'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>DOC Processing:</span>
-                    <span class="status-value ${data.docx_processing_available || data.doc_processing_available ? 'success' : 'error'}">
-                        ${data.docx_processing_available || data.doc_processing_available ? '✅ Available' : '❌ Missing'}
-                    </span>
-                </div>
-            `;
-            
-            authStatus.innerHTML = `
-                <div class="status-item">
-                    <span>Gmail Service:</span>
-                    <span class="status-value ${data.gmail_service_active ? 'success' : 'error'}">
-                        ${data.gmail_service_active ? '✅ Active' : '❌ Inactive'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>Drive Service:</span>
-                    <span class="status-value ${data.drive_service_active ? 'success' : 'error'}">
-                        ${data.drive_service_active ? '✅ Active' : '❌ Inactive'}
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span>Current User:</span>
-                    <span class="status-value ${data.current_user ? 'success' : 'warning'}">
-                        ${data.current_user || 'Not authenticated'}
-                    </span>
-                </div>
-            `;
-        }
-
-        function updateStats(stats) {
-            if (stats) {
-                document.getElementById('total-emails').textContent = stats.total_emails || 0;
-                document.getElementById('resumes-found').textContent = stats.resumes_found || 0;
-                document.getElementById('errors-count').textContent = stats.processing_errors || 0;
-                
-                if (stats.last_scan_time) {
-                    const lastScan = new Date(stats.last_scan_time).toLocaleString();
-                    document.getElementById('last-scan').textContent = lastScan;
-                }
-            }
-        }
-
-        function addLogToDisplay(message, level = 'info') {
-            const logsContainer = document.getElementById('logs-container');
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = document.createElement('div');
-            logEntry.className = `log-entry ${level}`;
-            logEntry.textContent = `[${timestamp}] ${message}`;
-            
-            logsContainer.appendChild(logEntry);
-            logsContainer.scrollTop = logsContainer.scrollHeight;
-            
-            while (logsContainer.children.length > 100) {
-                logsContainer.removeChild(logsContainer.firstChild);
-            }
-        }
-
-        function startLogPolling() {
-            setInterval(() => {
-                if (isAdmin) {
-                    fetch('/api/logs')
-                        .then(r => r.json())
-                        .then(logs => {
-                            const logsContainer = document.getElementById('logs-container');
-                            
-                            const newLogs = logs.slice(logCount);
-                            newLogs.forEach(log => {
-                                const logEntry = document.createElement('div');
-                                logEntry.className = `log-entry ${log.level}`;
-                                logEntry.textContent = `[${log.timestamp}] ${log.message}`;
-                                logsContainer.appendChild(logEntry);
-                            });
-                            
-                            logCount = logs.length;
-                            logsContainer.scrollTop = logsContainer.scrollHeight;
-                            
-                            while (logsContainer.children.length > 100) {
-                                logsContainer.removeChild(logsContainer.firstChild);
-                            }
-                        })
-                        .catch(e => console.error('Log polling failed:', e));
-                }
-            }, 2000);
-        }
-        </script>
-    </body>
-    </html>
-    '''
-    return render_template_string(template)
-
-@app.route('/api/auth', methods=['POST'])
-def api_auth():
-    """Admin authentication"""
-    data = request.get_json()
-    password = data.get('password', '')
-    
-    if password == ADMIN_PASSWORD:
-        session['admin_authenticated'] = True
-        return jsonify({'success': True})
-    else:
-        return jsonify({'success': False})
-
-@app.route('/api/setup-gmail', methods=['POST'])
-@admin_required
-def api_setup_gmail():
-    """Setup Gmail API authentication"""
-    try:
-        data = request.get_json() or {}
-        user_email = data.get('user_email')
-        
-        if not GOOGLE_APIS_AVAILABLE:
-            return jsonify({'status': 'error', 'message': 'Google API libraries not available'})
-        
-        if scanner.authenticate_google_apis(user_email):
-            if scanner.setup_drive_folders():
-                return jsonify({'status': 'success', 'message': 'Gmail integration setup completed'})
-            else:
-                return jsonify({'status': 'error', 'message': 'Drive folder setup failed'})
-        else:
-            return jsonify({'status': 'error', 'message': 'Gmail authentication failed'})
-            
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': f'Setup failed: {str(e)}'})
-
-@app.route('/api/oauth-code', methods=['POST'])
-@admin_required
-def api_oauth_code():
-    """Submit OAuth authorization code"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'status': 'error', 'message': 'No data received'})
-            
-        auth_code = data.get('code', '').strip()
-        if not auth_code:
-            return jsonify({'status': 'error', 'message': 'Authorization code is required'})
-        
-        if not hasattr(scanner, '_oauth_flow') or not scanner._oauth_flow:
-            return jsonify({'status': 'error', 'message': 'OAuth flow not found. Please restart Gmail setup.'})
-        
-        try:
-            # Exchange code for credentials
-            scanner._oauth_flow.fetch_token(code=auth_code)
-            creds = scanner._oauth_flow.credentials
-            
-            # Save credentials
-            try:
-                temp_gmail_service = build('gmail', 'v1', credentials=creds)
-                profile = temp_gmail_service.users().getProfile(userId='me').execute()
-                user_email = profile.get('emailAddress')
-                
-                if user_email:
-                    token_filename = f'token_{user_email.replace("@", "_").replace(".", "_")}.json'
-                    with open(token_filename, 'w') as token:
-                        token.write(creds.to_json())
-                    scanner.add_log(f"💾 Saved token for {user_email}", 'success')
-                    
-                with open('token.json', 'w') as token:
-                    token.write(creds.to_json())
-                    
-            except Exception as e:
-                scanner.add_log(f"⚠️ Could not save token: {e}", 'warning')
-            
-            # Initialize services
-            scanner.credentials = creds
-            if scanner._test_credentials():
-                if scanner.setup_drive_folders():
-                    scanner._oauth_flow = None
-                    return jsonify({'status': 'success', 'message': 'OAuth authentication completed successfully'})
-                else:
-                    return jsonify({'status': 'error', 'message': 'Drive folder setup failed'})
-            else:
-                return jsonify({'status': 'error', 'message': 'Credential verification failed'})
-            
-        except Exception as e:
-            error_str = str(e).lower()
-            if "invalid_grant" in error_str:
-                scanner.add_log("💡 Authorization code may have expired", 'warning')
-            return jsonify({'status': 'error', 'message': f'Failed to exchange code: {str(e)}'})
-        
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': f'OAuth submission failed: {str(e)}'})
-
-@app.route('/api/users')
-@admin_required
-def api_users():
-    """Get list of authenticated users"""
-    try:
-        users = list(scanner.user_credentials.keys())
-        if scanner.current_user_email and scanner.current_user_email not in users:
-            users.append(scanner.current_user_email)
-        return jsonify({'users': users})
-    except Exception as e:
-        return jsonify({'error': str(e)})
-
-@app.route('/api/scan-gmail', methods=['POST'])
-@admin_required
-def api_scan_gmail():
-    """Full Gmail scan"""
-    result = scanner.scan_emails()
-    return jsonify(result)
-
-@app.route('/api/stop-scan', methods=['POST'])
-@admin_required
-def api_stop_scan():
-    """Stop ongoing scan"""
-    # This would need implementation in the scanner class
-    # For now, return success
-    return jsonify({'status': 'success', 'message': 'Scan stop requested'})
-
-@app.route('/api/quick-scan', methods=['POST'])
-@admin_required
-def api_quick_scan():
-    """Quick Gmail scan"""
-    result = scanner.scan_emails(max_results=50)
-    return jsonify(result)
-
-@app.route('/api/test-system', methods=['POST'])
-@admin_required
-def api_test_system():
-    """Test system components"""
-    status = scanner.get_system_status()
-    return jsonify(status)
-
-@app.route('/api/status')
-@admin_required
-def api_status():
-    """Get system status"""
-    return jsonify(scanner.get_system_status())
-
-@app.route('/api/logs')
-@admin_required
-def api_logs():
-    """Get recent logs"""
-    return jsonify(scanner.logs)
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+                temp_file.write(doc_
