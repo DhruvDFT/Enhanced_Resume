@@ -50,7 +50,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'vlsi-scanner-secret-key-2024')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/drive.file'
+    'https://www.googleapis.com/auth/drive'  # Add this line
 ]
 
 logging.basicConfig(level=logging.INFO)
