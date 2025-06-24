@@ -106,18 +106,32 @@ class VLSIResumeScanner:
             }
         }
 
+    def save_credentials(self, client_id: str, client_secret: str, project_id: str):
+        """Save credentials to environment/session"""
+        try:
+            # Store in session for this instance
+            session['google_client_id'] = client_id
+            session['google_client_secret'] = client_secret
+            session['google_project_id'] = project_id
+            
+            self.add_log("✅ Google credentials saved to session", 'info')
+            return {'success': True, 'message': 'Credentials saved successfully'}
+        except Exception as e:
+            self.add_log(f"❌ Failed to save credentials: {e}", 'error')
+            return {'success': False, 'error': str(e)}
+
     def start_oauth_flow(self):
         """Start OAuth authentication flow"""
         try:
             if not GOOGLE_APIS_AVAILABLE:
                 return {'success': False, 'error': 'Google APIs not available'}
                 
-            # Get credentials from environment
-            client_id = os.environ.get('GOOGLE_CLIENT_ID')
-            client_secret = os.environ.get('GOOGLE_CLIENT_SECRET')
+            # Get credentials from environment or session
+            client_id = os.environ.get('GOOGLE_CLIENT_ID') or session.get('google_client_id')
+            client_secret = os.environ.get('GOOGLE_CLIENT_SECRET') or session.get('google_client_secret')
             
             if not client_id or not client_secret:
-                return {'success': False, 'error': 'OAuth credentials not configured'}
+                return {'success': False, 'error': 'OAuth credentials not configured. Please set them up first.'}
             
             credentials_dict = {
                 "installed": {
@@ -140,7 +154,7 @@ class VLSIResumeScanner:
                 include_granted_scopes='true'
             )
             
-            self.add_log("🌐 OAuth authorization required", 'info')
+            self.add_log("🌐 OAuth authorization URL generated", 'info')
             return {
                 'success': True, 
                 'auth_url': auth_url,
@@ -183,7 +197,7 @@ scanner = VLSIResumeScanner()
 
 @app.route('/')
 def index():
-    """Main dashboard"""
+    """Main dashboard with integrated setup"""
     template = '''
     <!DOCTYPE html>
     <html lang="en">
@@ -224,11 +238,11 @@ def index():
             }
             .input-group {
                 display: flex; gap: 10px; margin-bottom: 20px;
-                justify-content: center; align-items: center;
+                justify-content: center; align-items: center; flex-wrap: wrap;
             }
             .input-group input {
                 padding: 12px; border: 1px solid #ddd;
-                border-radius: 5px; font-size: 1em; width: 250px;
+                border-radius: 5px; font-size: 1em; min-width: 250px;
             }
             .input-group button, .btn {
                 padding: 12px 24px; background: #4a90e2; color: white;
@@ -240,7 +254,9 @@ def index():
             .btn-success:hover { background: #218838; }
             .btn-warning { background: #ffc107; color: #212529; }
             .btn-warning:hover { background: #e0a800; }
-            .main-content { display: none; }
+            .btn-info { background: #17a2b8; }
+            .btn-info:hover { background: #138496; }
+            .main-content, .setup-content { display: none; }
             .dashboard-grid {
                 display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
                 gap: 20px; margin-top: 30px;
@@ -268,7 +284,36 @@ def index():
                 background: #f8f9fa; padding: 10px; border-radius: 5px;
                 word-break: break-all; margin: 10px 0; font-size: 0.9em;
             }
+            .setup-wizard {
+                background: #e3f2fd; border: 2px solid #2196f3;
+                border-radius: 10px; padding: 30px; margin: 20px 0;
+                text-align: center;
+            }
+            .setup-step {
+                background: white; border-radius: 8px; padding: 20px;
+                margin: 15px 0; border-left: 4px solid #2196f3;
+                text-align: left;
+            }
+            .setup-step h5 { color: #1976d2; margin-bottom: 10px; }
+            .setup-step p { margin-bottom: 8px; line-height: 1.5; }
+            .credentials-form {
+                background: white; padding: 20px; border-radius: 8px;
+                margin: 20px 0; text-align: left;
+            }
+            .form-group { margin-bottom: 15px; }
+            .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+            .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+            .form-group small { color: #666; font-size: 0.9em; }
             .hidden { display: none; }
+            .tab-container { margin-bottom: 20px; }
+            .tab-button { 
+                padding: 10px 20px; margin-right: 10px; border: none; 
+                background: #f0f0f0; border-radius: 5px 5px 0 0; cursor: pointer;
+            }
+            .tab-button.active { background: #4a90e2; color: white; }
+            .alert { padding: 15px; margin: 15px 0; border-radius: 5px; }
+            .alert-info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+            .alert-warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
         </style>
     </head>
     <body>
@@ -280,8 +325,8 @@ def index():
             
             <div class="content">
                 <div class="status">
-                    <h3>✅ Railway Deployment Successful!</h3>
-                    <p>Application is running and ready for Google API integration.</p>
+                    <h3>✅ Application Ready!</h3>
+                    <p>Complete setup to start scanning resumes from Gmail.</p>
                 </div>
 
                 <div id="auth-section" class="auth-section">
@@ -293,9 +338,93 @@ def index():
                     <p>Enter admin password to access the VLSI Resume Scanner dashboard</p>
                 </div>
 
+                <div id="setup-content" class="setup-content">
+                    <div class="setup-wizard">
+                        <h2>🛠️ Google API Setup Wizard</h2>
+                        <p>Let's set up your Google API credentials step by step</p>
+                        
+                        <div class="tab-container">
+                            <button class="tab-button active" onclick="showTab('instructions')">📋 Instructions</button>
+                            <button class="tab-button" onclick="showTab('credentials')">🔑 Enter Credentials</button>
+                        </div>
+
+                        <div id="instructions-tab">
+                            <div class="setup-step">
+                                <h5>Step 1: Create Google Cloud Project</h5>
+                                <p>1. Visit <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></p>
+                                <p>2. Click "Select a project" → "NEW PROJECT"</p>
+                                <p>3. Enter project name: "VLSI Resume Scanner"</p>
+                                <p>4. Click "CREATE"</p>
+                            </div>
+
+                            <div class="setup-step">
+                                <h5>Step 2: Enable Required APIs</h5>
+                                <p>1. Go to "APIs & Services" → "Library"</p>
+                                <p>2. Search and enable these APIs:</p>
+                                <ul style="margin-left: 20px;">
+                                    <li>Gmail API</li>
+                                    <li>Google Drive API</li>
+                                    <li>Google Sheets API</li>
+                                </ul>
+                            </div>
+
+                            <div class="setup-step">
+                                <h5>Step 3: Create OAuth Credentials</h5>
+                                <p>1. Go to "APIs & Services" → "Credentials"</p>
+                                <p>2. Click "OAuth consent screen" and configure:</p>
+                                <ul style="margin-left: 20px;">
+                                    <li>User Type: External</li>
+                                    <li>App name: VLSI Resume Scanner</li>
+                                    <li>Add your email as test user</li>
+                                </ul>
+                                <p>3. Go to "Credentials" → "CREATE CREDENTIALS" → "OAuth 2.0 Client IDs"</p>
+                                <p>4. Choose "Desktop application"</p>
+                                <p>5. Copy the Client ID and Client Secret</p>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <strong>💡 Pro Tip:</strong> Keep the Google Cloud Console tab open while entering credentials in the next tab.
+                            </div>
+                        </div>
+
+                        <div id="credentials-tab" class="hidden">
+                            <div class="credentials-form">
+                                <h4>🔑 Enter Your Google API Credentials</h4>
+                                
+                                <div class="form-group">
+                                    <label for="client-id">Google Client ID</label>
+                                    <input type="text" id="client-id" placeholder="123456789-abc...googleusercontent.com">
+                                    <small>Found in Google Cloud Console → Credentials → OAuth 2.0 Client IDs</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="client-secret">Google Client Secret</label>
+                                    <input type="text" id="client-secret" placeholder="GOCSPX-abc123...">
+                                    <small>Found next to the Client ID in Google Cloud Console</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="project-id">Google Project ID</label>
+                                    <input type="text" id="project-id" placeholder="vlsi-scanner-123456">
+                                    <small>Found in Google Cloud Console project selector</small>
+                                </div>
+
+                                <div class="input-group">
+                                    <button class="btn btn-success" onclick="saveCredentials()">💾 Save Credentials</button>
+                                    <button class="btn" onclick="showMainDashboard()">⏭️ Skip for Now</button>
+                                </div>
+
+                                <div class="alert alert-warning">
+                                    <strong>⚠️ Note:</strong> Credentials are stored in session only. For permanent storage, set environment variables.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="main-content" class="main-content">
                     <h2>🎛️ VLSI Resume Scanner Dashboard</h2>
-                    <p>Welcome to the admin panel. Set up Google API integration to start scanning resumes.</p>
+                    <p>Welcome to the admin panel. Your Google API integration status is shown below.</p>
                     
                     <div class="dashboard-grid">
                         <div class="card">
@@ -304,6 +433,7 @@ def index():
                                 <p>Loading system status...</p>
                             </div>
                             <button class="btn" onclick="refreshStatus()">🔄 Refresh Status</button>
+                            <button class="btn btn-info" onclick="showSetupWizard()">🛠️ Setup Wizard</button>
                         </div>
                         
                         <div class="card">
@@ -346,6 +476,64 @@ def index():
         </div>
 
         <script>
+        function showTab(tabName) {
+            // Hide all tabs
+            document.getElementById('instructions-tab').classList.add('hidden');
+            document.getElementById('credentials-tab').classList.add('hidden');
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            event.target.classList.add('active');
+        }
+
+        function showSetupWizard() {
+            document.getElementById('main-content').style.display = 'none';
+            document.getElementById('setup-content').style.display = 'block';
+        }
+
+        function showMainDashboard() {
+            document.getElementById('setup-content').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+            refreshStatus();
+        }
+
+        function saveCredentials() {
+            const clientId = document.getElementById('client-id').value;
+            const clientSecret = document.getElementById('client-secret').value;
+            const projectId = document.getElementById('project-id').value;
+            
+            if (!clientId || !clientSecret || !projectId) {
+                alert('Please fill in all credential fields');
+                return;
+            }
+            
+            fetch('/api/save-credentials', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    project_id: projectId
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Credentials saved successfully!');
+                    showMainDashboard();
+                } else {
+                    alert('❌ Failed to save credentials: ' + data.error);
+                }
+            })
+            .catch(err => {
+                alert('Failed to save credentials');
+                console.error('Save error:', err);
+            });
+        }
+
         function authenticate() {
             const password = document.getElementById('admin-password').value;
             
@@ -363,8 +551,16 @@ def index():
             .then(data => {
                 if (data.success) {
                     document.getElementById('auth-section').style.display = 'none';
-                    document.getElementById('main-content').style.display = 'block';
-                    refreshStatus();
+                    // Check if credentials are configured
+                    fetch('/api/status')
+                    .then(r => r.json())
+                    .then(status => {
+                        if (status.environment_check.has_client_id && status.environment_check.has_client_secret) {
+                            showMainDashboard();
+                        } else {
+                            document.getElementById('setup-content').style.display = 'block';
+                        }
+                    });
                 } else {
                     alert('Invalid password. Please try again.');
                     document.getElementById('admin-password').value = '';
@@ -384,6 +580,7 @@ def index():
                 statusDiv.innerHTML = `
                     <p><strong>Google APIs:</strong> ${data.google_apis_available ? '✅' : '❌'}</p>
                     <p><strong>PDF Processing:</strong> ${data.pdf_processing_available ? '✅' : '❌'}</p>
+                    <p><strong>Credentials:</strong> ${data.environment_check.has_client_id ? '✅' : '❌'}</p>
                     <p><strong>Current User:</strong> ${data.current_user || 'Not authenticated'}</p>
                     <p><strong>Gmail Service:</strong> ${data.gmail_service_active ? '✅' : '❌'}</p>
                     <p><strong>Drive Service:</strong> ${data.drive_service_active ? '✅' : '❌'}</p>
@@ -425,7 +622,12 @@ def index():
                     document.getElementById('setup-btn').textContent = '⏳ Waiting for Authorization...';
                     document.getElementById('setup-btn').disabled = true;
                 } else {
-                    alert('Failed to start OAuth: ' + data.error);
+                    if (data.error.includes('not configured')) {
+                        alert('Please set up your Google API credentials first using the Setup Wizard');
+                        showSetupWizard();
+                    } else {
+                        alert('Failed to start OAuth: ' + data.error);
+                    }
                 }
             })
             .catch(err => {
@@ -473,192 +675,3 @@ def index():
                 if (data.success) {
                     document.getElementById('scan-results').innerHTML = 
                         `<p>✅ Scan completed! Found ${data.resumes_found || 0} resumes in ${data.emails_scanned || 0} emails.</p>`;
-                } else {
-                    document.getElementById('scan-results').innerHTML = 
-                        `<p style="color: red;">❌ Scan failed: ${data.error}</p>`;
-                }
-                refreshStatus();
-            })
-            .catch(err => {
-                document.getElementById('scan-results').innerHTML = 
-                    '<p style="color: red;">❌ Scan request failed</p>';
-                console.error('Scan error:', err);
-            });
-        }
-
-        function clearLogs() {
-            fetch('/api/clear-logs', { method: 'POST' })
-            .then(() => {
-                document.getElementById('logs-container').innerHTML = '<p>Logs cleared</p>';
-            });
-        }
-
-        // Handle Enter key in password field
-        document.getElementById('admin-password').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                authenticate();
-            }
-        });
-
-        // Auto-refresh status every 30 seconds when authenticated
-        setInterval(() => {
-            if (document.getElementById('main-content').style.display !== 'none') {
-                refreshStatus();
-            }
-        }, 30000);
-        </script>
-    </body>
-    </html>
-    '''
-    return render_template_string(template)
-
-@app.route('/api/auth', methods=['POST'])
-def api_auth():
-    """Admin authentication"""
-    try:
-        data = request.get_json()
-        password = data.get('password', '')
-        
-        if password == ADMIN_PASSWORD:
-            session['admin_authenticated'] = True
-            scanner.add_log("🔑 Admin authentication successful", 'info')
-            return jsonify({'success': True, 'message': 'Authentication successful'})
-        else:
-            scanner.add_log("❌ Failed admin authentication attempt", 'warning')
-            return jsonify({'success': False, 'message': 'Invalid password'})
-    except Exception as e:
-        scanner.add_log(f"❌ Authentication error: {e}", 'error')
-        return jsonify({'success': False, 'message': f'Authentication error: {str(e)}'})
-
-@app.route('/api/status')
-def api_status():
-    """Get system status"""
-    try:
-        # Check if user is authenticated
-        if not session.get('admin_authenticated'):
-            return jsonify({'error': 'Authentication required'}), 401
-            
-        status = scanner.get_system_status()
-        status['timestamp'] = datetime.now().isoformat()
-        status['session_active'] = session.get('admin_authenticated', False)
-        
-        return jsonify(status)
-    except Exception as e:
-        scanner.add_log(f"❌ Status check failed: {e}", 'error')
-        return jsonify({'error': f'Status check failed: {str(e)}'}), 500
-
-@app.route('/api/start-oauth', methods=['POST'])
-def api_start_oauth():
-    """Start OAuth flow"""
-    try:
-        if not session.get('admin_authenticated'):
-            return jsonify({'error': 'Authentication required'}), 401
-            
-        result = scanner.start_oauth_flow()
-        return jsonify(result)
-    except Exception as e:
-        scanner.add_log(f"❌ OAuth start failed: {e}", 'error')
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/complete-oauth', methods=['POST'])
-def api_complete_oauth():
-    """Complete OAuth flow"""
-    try:
-        if not session.get('admin_authenticated'):
-            return jsonify({'error': 'Authentication required'}), 401
-            
-        data = request.get_json()
-        auth_code = data.get('auth_code', '')
-        
-        if not auth_code:
-            return jsonify({'success': False, 'error': 'Authorization code required'})
-            
-        result = scanner.complete_oauth_flow(auth_code)
-        return jsonify(result)
-    except Exception as e:
-        scanner.add_log(f"❌ OAuth completion failed: {e}", 'error')
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/scan-emails', methods=['POST'])
-def api_scan_emails():
-    """Scan emails for resumes"""
-    try:
-        if not session.get('admin_authenticated'):
-            return jsonify({'error': 'Authentication required'}), 401
-            
-        if not scanner.gmail_service:
-            return jsonify({'success': False, 'error': 'Gmail authentication required'})
-            
-        # This is a placeholder - implement actual email scanning logic
-        scanner.add_log("📧 Starting email scan", 'info')
-        
-        # Simulate scanning
-        scanner.stats['total_emails'] = 50
-        scanner.stats['resumes_found'] = 5
-        scanner.stats['last_scan_time'] = datetime.now().isoformat()
-        
-        scanner.add_log("✅ Email scan completed", 'info')
-        
-        return jsonify({
-            'success': True,
-            'emails_scanned': scanner.stats['total_emails'],
-            'resumes_found': scanner.stats['resumes_found']
-        })
-    except Exception as e:
-        scanner.add_log(f"❌ Email scan failed: {e}", 'error')
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/clear-logs', methods=['POST'])
-def api_clear_logs():
-    """Clear system logs"""
-    try:
-        if not session.get('admin_authenticated'):
-            return jsonify({'error': 'Authentication required'}), 401
-            
-        scanner.logs.clear()
-        scanner.add_log("🗑️ Logs cleared", 'info')
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/health')
-def health_check():
-    """Railway health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
-        'google_apis': GOOGLE_APIS_AVAILABLE,
-        'pdf_processing': PDF_PROCESSING_AVAILABLE,
-        'message': 'VLSI Resume Scanner is running successfully'
-    })
-
-@app.route('/api/test')
-def api_test():
-    """Simple API test endpoint"""
-    return jsonify({
-        'message': 'VLSI Resume Scanner API is working!',
-        'timestamp': datetime.now().isoformat(),
-        'status': 'success',
-        'features': {
-            'google_apis': GOOGLE_APIS_AVAILABLE,
-            'pdf_processing': PDF_PROCESSING_AVAILABLE,
-            'docx_processing': DOCX_PROCESSING_AVAILABLE
-        }
-    })
-
-# Error handlers
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({'error': 'Endpoint not found', 'available_endpoints': [
-        '/', '/health', '/api/test', '/api/auth', '/api/status'
-    ]}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    scanner.add_log(f"❌ Internal server error: {error}", 'error')
-    return jsonify({'error': 'Internal server error'}), 500
-
-# Initialize scanner on startup
-scanner.add_log("🚀 VLSI Resume Scanner initialized", 'info')
-scanner.add_log(f"📊 Google APIs available: {GOOGLE_APIS_AVAILABLE}", 'info')
-scanner.add_log(f"📄 PDF processing available: {PDF_PROCESSING_AVAILABLE}", 'info')
