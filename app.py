@@ -138,7 +138,8 @@ class VLSIResumeScanner:
                     "client_secret": client_secret,
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost"]
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                    "redirect_uris": ["http://localhost:1", "urn:ietf:wg:oauth:2.0:oob"]
                 }
             }
             
@@ -146,11 +147,12 @@ class VLSIResumeScanner:
             flow = InstalledAppFlow.from_client_config(credentials_dict, SCOPES)
             self._oauth_flow = flow
             
-            # Generate auth URL
+            # Generate auth URL with proper redirect handling
             auth_url, _ = flow.authorization_url(
                 access_type='offline',
                 prompt='select_account',
-                include_granted_scopes='true'
+                include_granted_scopes='true',
+                redirect_uri='urn:ietf:wg:oauth:2.0:oob'
             )
             
             self.add_log("🌐 OAuth authorization URL generated", 'info')
