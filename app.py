@@ -55,13 +55,16 @@ SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets'
 ]
 
-# RAILWAY FIX 4: Add health check and startup optimization
-@app.before_first_request
+# RAILWAY FIX 4: Add health check and startup optimization (Flask 2.3+ compatible)
 def initialize_app():
-    """Initialize app - this runs before first request"""
+    """Initialize app - this runs on startup"""
     app.logger.info("🚀 VLSI Resume Scanner starting up...")
     app.logger.info(f"📊 Google APIs available: {GOOGLE_APIS_AVAILABLE}")
     app.logger.info(f"🔧 Environment: Railway Cloud")
+
+# Call initialization immediately
+with app.app_context():
+    initialize_app()
 
 @app.route('/health')
 def health_check():
