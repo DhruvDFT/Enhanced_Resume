@@ -165,7 +165,7 @@ class VLSIResumeScanner:
             return {'success': False, 'error': str(e)}
 
     def start_oauth_flow(self):
-        """Start OAuth authentication flow - BULLETPROOF VERSION"""
+        """Start OAuth authentication flow - ULTIMATE FIX VERSION"""
         try:
             if not GOOGLE_APIS_AVAILABLE:
                 return {'success': False, 'error': 'Google APIs not available'}
@@ -177,98 +177,159 @@ class VLSIResumeScanner:
             if not client_id or not client_secret:
                 return {'success': False, 'error': 'OAuth credentials not configured'}
             
-            # STEP 1: Create minimal credentials config (NO redirect_uris here!)
-            credentials_dict = {
-                "installed": {
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+            # ULTIMATE FIX: Use manual URL construction to avoid oauthlib conflicts
+            try:
+                import urllib.parse
+                
+                # Build OAuth URL manually - this eliminates ALL redirect_uri conflicts
+                params = {
+                    'client_id': client_id,
+                    'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob',
+                    'scope': ' '.join(SCOPES),
+                    'response_type': 'code',
+                    'access_type': 'offline',
+                    'prompt': 'select_account'
                 }
-            }
-            
-            # STEP 2: Create flow WITHOUT any redirect_uri parameter
-            try:
-                flow = InstalledAppFlow.from_client_config(credentials_dict, SCOPES)
-                self._oauth_flow = flow
-                self.add_log("✅ OAuth flow object created successfully", 'info')
-            except Exception as flow_error:
-                self.add_log(f"❌ Flow creation failed: {flow_error}", 'error')
-                return {'success': False, 'error': f'Flow creation failed: {str(flow_error)}'}
-            
-            # STEP 3: Generate auth URL with redirect_uri ONLY here
-            try:
-                auth_url, state = flow.authorization_url(
-                    access_type='offline',
-                    prompt='select_account',
-                    include_granted_scopes='true',
-                    redirect_uri='urn:ietf:wg:oauth:2.0:oob'
-                )
-                self.add_log("✅ Authorization URL generated successfully", 'info')
-            except Exception as url_error:
-                self.add_log(f"❌ URL generation failed: {url_error}", 'error')
-                return {'success': False, 'error': f'URL generation failed: {str(url_error)}'}
-            
-            self.add_log("🌐 OAuth flow ready - no conflicts detected", 'info')
-            return {
-                'success': True, 
-                'auth_url': auth_url,
-                'message': 'Please visit the authorization URL and enter the code'
-            }
+                
+                auth_url = 'https://accounts.google.com/o/oauth2/auth?' + urllib.parse.urlencode(params)
+                
+                # Store credentials for later use
+                session['oauth_client_id'] = client_id
+                session['oauth_client_secret'] = client_secret
+                
+                self.add_log("✅ Manual OAuth URL generated successfully", 'info')
+                
+                return {
+                    'success': True, 
+                    'auth_url': auth_url,
+                    'message': 'Please visit the authorization URL and enter the code',
+                    'method': 'manual'
+                }
+                
+            except Exception as manual_error:
+                self.add_log(f"❌ Manual URL generation failed: {manual_error}", 'error')
+                
+                # FALLBACK: Try the original method with extra safety
+                try:
+                    # Clear any existing flow
+                    self._oauth_flow = None
+                    
+                    # Create minimal credentials config
+                    credentials_dict = {
+                        "installed": {
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                            "token_uri": "https://oauth2.googleapis.com/token"
+                        }
+                    }
+                    
+                    # Create flow with explicit redirect_uri parameter
+                    flow = InstalledAppFlow.from_client_config(
+                        credentials_dict, 
+                        SCOPES, 
+                        redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+                    )
+                    
+                    # Generate URL WITHOUT specifying redirect_uri again
+                    auth_url, _ = flow.authorization_url(
+                        access_type='offline',
+                        prompt='select_account'
+                    )
+                    
+                    self._oauth_flow = flow
+                    self.add_log("✅ Fallback OAuth flow created", 'info')
+                    
+                    return {
+                        'success': True, 
+                        'auth_url': auth_url,
+                        'message': 'Please visit the authorization URL and enter the code',
+                        'method': 'fallback'
+                    }
+                    
+                except Exception as fallback_error:
+                    self.add_log(f"❌ All OAuth methods failed: {fallback_error}", 'error')
+                    return {'success': False, 'error': 'OAuth setup failed - please check credentials'}
             
         except Exception as e:
             error_msg = str(e)
             self.add_log(f"❌ OAuth flow failed: {error_msg}", 'error')
-            
-            # Provide specific help for common issues
-            if "redirect_uri" in error_msg.lower():
-                return {'success': False, 'error': 'OAuth redirect URI conflict - using fallback method'}
-            elif "client_id" in error_msg.lower():
-                return {'success': False, 'error': 'Invalid client ID - please check credentials'}
-            elif "scope" in error_msg.lower():
-                return {'success': False, 'error': 'OAuth scope issue - please contact support'}
-            else:
-                return {'success': False, 'error': f'OAuth setup failed: {error_msg}'}
+            return {'success': False, 'error': f'OAuth setup failed: {error_msg}'}
 
     def complete_oauth_flow(self, auth_code: str):
-        """Complete OAuth flow - BULLETPROOF VERSION"""
+        """Complete OAuth flow - ULTIMATE FIX VERSION"""
         try:
-            if not self._oauth_flow:
-                self.add_log("❌ No OAuth flow found", 'error')
-                return {'success': False, 'error': 'OAuth flow not started - please try authentication again'}
-            
             if not auth_code or not auth_code.strip():
                 return {'success': False, 'error': 'Authorization code is required'}
             
             auth_code = auth_code.strip()
             self.add_log(f"🔄 Processing auth code: {auth_code[:10]}...", 'info')
             
-            # STEP 1: Set redirect_uri for token exchange
-            try:
-                self._oauth_flow.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'
-                self.add_log("✅ Redirect URI set for token exchange", 'info')
-            except Exception as redirect_error:
-                self.add_log(f"⚠️ Redirect URI warning: {redirect_error}", 'warning')
+            # Get stored credentials
+            client_id = session.get('oauth_client_id') or os.environ.get('GOOGLE_CLIENT_ID')
+            client_secret = session.get('oauth_client_secret') or os.environ.get('GOOGLE_CLIENT_SECRET')
             
-            # STEP 2: Exchange code for token with detailed error handling
+            if not client_id or not client_secret:
+                return {'success': False, 'error': 'OAuth credentials not found - please restart authentication'}
+            
+            # ULTIMATE FIX: Manual token exchange to avoid oauthlib conflicts
             try:
-                self._oauth_flow.fetch_token(code=auth_code)
-                self.credentials = self._oauth_flow.credentials
-                self.add_log("✅ Token exchange successful", 'info')
-            except Exception as token_error:
-                error_msg = str(token_error)
-                self.add_log(f"❌ Token exchange failed: {error_msg}", 'error')
+                import urllib.parse
+                import urllib.request
+                import json
                 
-                if "invalid_grant" in error_msg.lower():
-                    return {'success': False, 'error': 'Invalid or expired authorization code. Please try again.'}
-                elif "redirect_uri_mismatch" in error_msg.lower():
-                    return {'success': False, 'error': 'Redirect URI mismatch. Please contact support.'}
+                # Manual token exchange
+                token_data = {
+                    'client_id': client_id,
+                    'client_secret': client_secret,
+                    'code': auth_code,
+                    'grant_type': 'authorization_code',
+                    'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob'
+                }
+                
+                token_request = urllib.request.Request(
+                    'https://oauth2.googleapis.com/token',
+                    data=urllib.parse.urlencode(token_data).encode('utf-8'),
+                    headers={'Content-Type': 'application/x-www-form-urlencoded'}
+                )
+                
+                with urllib.request.urlopen(token_request) as response:
+                    token_response = json.loads(response.read().decode('utf-8'))
+                
+                if 'access_token' not in token_response:
+                    raise Exception('No access token in response')
+                
+                # Create credentials object manually
+                self.credentials = Credentials(
+                    token=token_response.get('access_token'),
+                    refresh_token=token_response.get('refresh_token'),
+                    token_uri='https://oauth2.googleapis.com/token',
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    scopes=SCOPES
+                )
+                
+                self.add_log("✅ Manual token exchange successful", 'info')
+                
+            except Exception as manual_error:
+                self.add_log(f"❌ Manual token exchange failed: {manual_error}", 'error')
+                
+                # FALLBACK: Try with existing flow if available
+                if self._oauth_flow:
+                    try:
+                        self._oauth_flow.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'
+                        self._oauth_flow.fetch_token(code=auth_code)
+                        self.credentials = self._oauth_flow.credentials
+                        self.add_log("✅ Fallback token exchange successful", 'info')
+                    except Exception as fallback_error:
+                        self.add_log(f"❌ Fallback token exchange failed: {fallback_error}", 'error')
+                        return {'success': False, 'error': f'Token exchange failed: {str(fallback_error)}'}
                 else:
-                    return {'success': False, 'error': f'Token exchange failed: {error_msg}'}
+                    return {'success': False, 'error': f'Manual token exchange failed: {str(manual_error)}'}
             
-            # STEP 3: Test services one by one
+            # Test services one by one
             services_status = {}
+            email = 'Unknown'
             
             # Test Gmail
             try:
@@ -280,12 +341,10 @@ class VLSIResumeScanner:
             except Exception as gmail_error:
                 services_status['gmail'] = '❌'
                 self.add_log(f"❌ Gmail service failed: {gmail_error}", 'error')
-                email = 'Unknown'
             
             # Test Drive
             try:
                 self.drive_service = build('drive', 'v3', credentials=self.credentials)
-                # Test with a simple API call
                 self.drive_service.about().get(fields='user').execute()
                 services_status['drive'] = '✅'
                 self.add_log("✅ Drive service active", 'info')
@@ -303,6 +362,10 @@ class VLSIResumeScanner:
                 self.add_log(f"❌ Sheets service failed: {sheets_error}", 'error')
             
             self.current_user_email = email
+            
+            # Clean up session
+            session.pop('oauth_client_id', None)
+            session.pop('oauth_client_secret', None)
             
             # Success with detailed status
             success_message = f"Authentication completed! Services: Gmail {services_status.get('gmail', '❌')}, Drive {services_status.get('drive', '❌')}, Sheets {services_status.get('sheets', '❌')}"
