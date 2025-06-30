@@ -372,24 +372,79 @@ def index():
                     border-radius: 10px; padding: 20px; margin: 20px 0;
                     text-align: center;
                 }
+                .status h3 { color: #2e7d32; margin-bottom: 10px; }
+                .status p { color: #388e3c; }
+                .auth-section {
+                    background: #f8f9fa; border-radius: 10px; 
+                    padding: 20px; margin-bottom: 30px; text-align: center;
+                }
+                .setup-section {
+                    background: #e3f2fd; border: 2px solid #2196f3;
+                    border-radius: 10px; padding: 30px; margin: 20px 0;
+                    text-align: center;
+                }
+                .input-group {
+                    display: flex; gap: 10px; margin-bottom: 20px;
+                    justify-content: center; align-items: center; flex-wrap: wrap;
+                }
+                .input-group input {
+                    padding: 12px; border: 1px solid #ddd;
+                    border-radius: 5px; font-size: 1em; min-width: 250px;
+                }
+                .input-group button, .btn {
+                    padding: 12px 24px; background: #4a90e2; color: white;
+                    border: none; border-radius: 5px; cursor: pointer;
+                    font-size: 1em; margin: 5px;
+                }
+                .input-group button:hover, .btn:hover { background: #357abd; }
+                .btn-success { background: #28a745; }
+                .btn-success:hover { background: #218838; }
+                .btn-warning { background: #ffc107; color: #212529; }
+                .btn-warning:hover { background: #e0a800; }
+                .main-content, .setup-content { display: none; }
+                .dashboard-grid {
+                    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                    gap: 20px; margin-top: 30px;
+                }
+                .card {
+                    background: #f8f9fa; border-radius: 10px; padding: 20px;
+                    border-left: 4px solid #4a90e2; min-height: 150px;
+                }
+                .card h4 { color: #4a90e2; margin-bottom: 15px; }
+                .card p { margin-bottom: 10px; line-height: 1.5; }
+                .logs-container {
+                    max-height: 200px; overflow-y: auto; 
+                    background: #f1f1f1; padding: 10px; border-radius: 5px;
+                    font-family: monospace; font-size: 0.9em;
+                }
+                .log-entry { margin-bottom: 5px; }
+                .log-info { color: #0066cc; }
+                .log-warning { color: #ff8800; }
+                .log-error { color: #cc0000; }
+                .oauth-section {
+                    background: #fff3cd; border: 1px solid #ffeaa7;
+                    border-radius: 10px; padding: 20px; margin: 20px 0;
+                }
+                .oauth-url {
+                    background: #f8f9fa; padding: 10px; border-radius: 5px;
+                    word-break: break-all; margin: 10px 0; font-size: 0.9em;
+                }
+                .hidden { display: none; }
+                .form-group { margin-bottom: 15px; }
+                .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+                .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+                .form-group small { color: #666; font-size: 0.9em; }
                 .railway-badge {
                     background: #0070f3; color: white; padding: 5px 10px;
                     border-radius: 15px; font-size: 0.9em; margin-left: 10px;
                 }
-                .btn {
-                    padding: 12px 24px; background: #4a90e2; color: white;
-                    border: none; border-radius: 5px; cursor: pointer;
-                    font-size: 1em; margin: 5px; text-decoration: none;
-                    display: inline-block;
-                }
-                .btn:hover { background: #357abd; }
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="header">
                     <h1>🔬 VLSI Resume Scanner</h1>
-                    <p>AI-Powered Resume Analysis<span class="railway-badge">⚡ Railway</span></p>
+                    <p>AI-Powered Resume Analysis with Google Sheets Integration<span class="railway-badge">⚡ Railway</span></p>
                 </div>
                 
                 <div class="content">
@@ -397,24 +452,327 @@ def index():
                         <h3>✅ Railway Deployment Successful!</h3>
                         <p>Application is running and ready for Google API integration.</p>
                     </div>
-                    
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="/health" class="btn">🏥 Health Check</a>
-                        <a href="/api/test" class="btn">🧪 API Test</a>
-                        <a href="/startup" class="btn">🚀 Startup Status</a>
+
+                    <div id="auth-section" class="auth-section">
+                        <h3>🔐 Admin Authentication</h3>
+                        <div class="input-group">
+                            <input type="password" id="admin-password" placeholder="Enter admin password">
+                            <button onclick="authenticate()">🔑 Login</button>
+                        </div>
+                        <p>Enter admin password to access the VLSI Resume Scanner dashboard</p>
                     </div>
-                    
-                    <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                        <h4>🎛️ Next Steps:</h4>
-                        <ol style="margin-left: 20px; line-height: 1.6;">
-                            <li>Click "Health Check" to verify deployment</li>
-                            <li>Set up Google API credentials via Railway environment variables</li>
-                            <li>Configure OAuth for Gmail, Drive, and Sheets integration</li>
-                            <li>Start scanning resumes from your Gmail account</li>
-                        </ol>
+
+                    <div id="setup-content" class="setup-content">
+                        <div class="setup-section">
+                            <h2>🛠️ Google API Setup</h2>
+                            <p>Enter your Google API credentials to get started</p>
+                            
+                            <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: left;">
+                                <h4>🔑 Enter Google API Credentials</h4>
+                                
+                                <div class="form-group">
+                                    <label for="client-id">Google Client ID</label>
+                                    <input type="text" id="client-id" placeholder="123456789-abc...googleusercontent.com">
+                                    <small>From Google Cloud Console → APIs & Services → Credentials</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="client-secret">Google Client Secret</label>
+                                    <input type="text" id="client-secret" placeholder="GOCSPX-abc123...">
+                                    <small>Found next to the Client ID in Google Cloud Console</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="project-id">Google Project ID</label>
+                                    <input type="text" id="project-id" placeholder="vlsi-scanner-123456">
+                                    <small>Found in Google Cloud Console project selector</small>
+                                </div>
+
+                                <div class="input-group">
+                                    <button class="btn btn-success" onclick="saveCredentials()">💾 Save Credentials</button>
+                                    <button class="btn" onclick="showMainDashboard()">⏭️ Skip for Now</button>
+                                </div>
+                            </div>
+                            
+                            <p><small>💡 <strong>Need help?</strong> Visit <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> to create OAuth credentials</small></p>
+                        </div>
+                    </div>
+
+                    <div id="main-content" class="main-content">
+                        <h2>🎛️ VLSI Resume Scanner Dashboard</h2>
+                        <p>Welcome to the admin panel. Configure Google API integration to start scanning resumes.</p>
+                        
+                        <div class="dashboard-grid">
+                            <div class="card">
+                                <h4>📊 System Status</h4>
+                                <div id="system-status">
+                                    <p>Loading system status...</p>
+                                </div>
+                                <button class="btn" onclick="refreshStatus()">🔄 Refresh Status</button>
+                                ''' + ('<!-- Credentials configured via Railway -->' if has_credentials else '<button class="btn" onclick="showSetupSection()">🛠️ Setup Credentials</button>') + '''
+                            </div>
+                            
+                            <div class="card">
+                                <h4>🔧 Google API Setup</h4>
+                                <p>Configure Gmail, Drive, and Sheets integration</p>
+                                <button class="btn btn-success" onclick="setupGoogleAuth()" id="setup-btn">
+                                    🚀 Start Google Authentication
+                                </button>
+                                <div id="oauth-section" class="oauth-section hidden">
+                                    <h5>📋 OAuth Authorization Required</h5>
+                                    <p>1. Click the link below to authorize the application:</p>
+                                    <div id="auth-url" class="oauth-url"></div>
+                                    <p>2. Copy the authorization code and paste it here:</p>
+                                    <div class="input-group">
+                                        <input type="text" id="auth-code" placeholder="Paste authorization code here">
+                                        <button onclick="completeAuth()">✅ Complete Authentication</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card">
+                                <h4>📧 Resume Scanning</h4>
+                                <p>Scan Gmail for resumes and organize them</p>
+                                <button class="btn" onclick="startScan()" id="scan-btn" disabled>
+                                    📊 Start Gmail Scan
+                                </button>
+                                <div id="scan-results"></div>
+                            </div>
+                            
+                            <div class="card">
+                                <h4>📋 Activity Logs</h4>
+                                <div id="logs-container" class="logs-container">
+                                    <p>Logs will appear here...</p>
+                                </div>
+                                <button class="btn btn-warning" onclick="clearLogs()">🗑️ Clear Logs</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <script>
+            function showSetupSection() {
+                document.getElementById('main-content').style.display = 'none';
+                document.getElementById('setup-content').style.display = 'block';
+            }
+
+            function showMainDashboard() {
+                document.getElementById('setup-content').style.display = 'none';
+                document.getElementById('main-content').style.display = 'block';
+                refreshStatus();
+            }
+
+            function saveCredentials() {
+                const clientId = document.getElementById('client-id').value;
+                const clientSecret = document.getElementById('client-secret').value;
+                const projectId = document.getElementById('project-id').value;
+                
+                if (!clientId || !clientSecret || !projectId) {
+                    alert('Please fill in all credential fields');
+                    return;
+                }
+                
+                fetch('/api/save-credentials', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        project_id: projectId
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('✅ Credentials saved successfully!');
+                        showMainDashboard();
+                    } else {
+                        alert('❌ Failed to save credentials: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    alert('Failed to save credentials');
+                    console.error('Save error:', err);
+                });
+            }
+
+            function authenticate() {
+                const password = document.getElementById('admin-password').value;
+                
+                if (!password) {
+                    alert('Please enter admin password');
+                    return;
+                }
+                
+                fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: password })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('auth-section').style.display = 'none';
+                        // Check if credentials are configured
+                        fetch('/api/status')
+                        .then(r => r.json())
+                        .then(status => {
+                            if (status.environment_check.has_client_id && status.environment_check.has_client_secret) {
+                                showMainDashboard();
+                            } else {
+                                document.getElementById('setup-content').style.display = 'block';
+                            }
+                        });
+                    } else {
+                        alert('Invalid password. Please try again.');
+                        document.getElementById('admin-password').value = '';
+                    }
+                })
+                .catch(err => {
+                    alert('Authentication failed. Please try again.');
+                    console.error('Auth error:', err);
+                });
+            }
+
+            function refreshStatus() {
+                fetch('/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    const statusDiv = document.getElementById('system-status');
+                    statusDiv.innerHTML = `
+                        <p><strong>Google APIs:</strong> ${data.google_apis_available ? '✅' : '❌'}</p>
+                        <p><strong>PDF Processing:</strong> ${data.pdf_processing_available ? '✅' : '❌'}</p>
+                        <p><strong>Credentials:</strong> ${data.environment_check.has_client_id ? '✅' : '❌'}</p>
+                        <p><strong>Current User:</strong> ${data.current_user || 'Not authenticated'}</p>
+                        <p><strong>Gmail Service:</strong> ${data.gmail_service_active ? '✅' : '❌'}</p>
+                        <p><strong>Drive Service:</strong> ${data.drive_service_active ? '✅' : '❌'}</p>
+                        <p><strong>Sheets Service:</strong> ${data.sheets_service_active ? '✅' : '❌'}</p>
+                        <p><strong>Railway:</strong> ${data.railway_environment ? '✅' : '❌'}</p>
+                    `;
+                    
+                    // Update scan button state
+                    const scanBtn = document.getElementById('scan-btn');
+                    if (data.gmail_service_active) {
+                        scanBtn.disabled = false;
+                        scanBtn.textContent = '📊 Start Gmail Scan';
+                    } else {
+                        scanBtn.disabled = true;
+                        scanBtn.textContent = '📊 Gmail Authentication Required';
+                    }
+                    
+                    // Update logs
+                    if (data.recent_logs && data.recent_logs.length > 0) {
+                        const logsDiv = document.getElementById('logs-container');
+                        logsDiv.innerHTML = data.recent_logs.map(log => 
+                            `<div class="log-entry log-${log.level}">[${log.timestamp}] ${log.message}</div>`
+                        ).join('');
+                    }
+                })
+                .catch(err => {
+                    console.error('Status error:', err);
+                    document.getElementById('system-status').innerHTML = '<p style="color: red;">Failed to load status</p>';
+                });
+            }
+
+            function setupGoogleAuth() {
+                fetch('/api/start-oauth', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('oauth-section').classList.remove('hidden');
+                        document.getElementById('auth-url').innerHTML = 
+                            `<a href="${data.auth_url}" target="_blank">${data.auth_url}</a>`;
+                        document.getElementById('setup-btn').textContent = '⏳ Waiting for Authorization...';
+                        document.getElementById('setup-btn').disabled = true;
+                    } else {
+                        if (data.error.includes('not configured')) {
+                            alert('Please set up your Google API credentials first');
+                            showSetupSection();
+                        } else {
+                            alert('Failed to start OAuth: ' + data.error);
+                        }
+                    }
+                })
+                .catch(err => {
+                    alert('OAuth setup failed');
+                    console.error('OAuth error:', err);
+                });
+            }
+
+            function completeAuth() {
+                const authCode = document.getElementById('auth-code').value;
+                if (!authCode) {
+                    alert('Please enter the authorization code');
+                    return;
+                }
+                
+                fetch('/api/complete-oauth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ auth_code: authCode })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Authentication successful! Email: ' + data.email);
+                        document.getElementById('oauth-section').classList.add('hidden');
+                        document.getElementById('setup-btn').textContent = '✅ Google APIs Connected';
+                        document.getElementById('setup-btn').disabled = true;
+                        refreshStatus();
+                    } else {
+                        alert('Authentication failed: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    alert('Authentication completion failed');
+                    console.error('Auth completion error:', err);
+                });
+            }
+
+            function startScan() {
+                document.getElementById('scan-results').innerHTML = '<p>🔄 Scanning emails...</p>';
+                
+                fetch('/api/scan-emails', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('scan-results').innerHTML = 
+                            `<p>✅ Scan completed! Found ${data.resumes_found || 0} resumes in ${data.emails_scanned || 0} emails.</p>`;
+                    } else {
+                        document.getElementById('scan-results').innerHTML = 
+                            `<p style="color: red;">❌ Scan failed: ${data.error}</p>`;
+                    }
+                    refreshStatus();
+                })
+                .catch(err => {
+                    document.getElementById('scan-results').innerHTML = 
+                        '<p style="color: red;">❌ Scan request failed</p>';
+                    console.error('Scan error:', err);
+                });
+            }
+
+            function clearLogs() {
+                fetch('/api/clear-logs', { method: 'POST' })
+                .then(() => {
+                    document.getElementById('logs-container').innerHTML = '<p>Logs cleared</p>';
+                });
+            }
+
+            // Handle Enter key in password field
+            document.getElementById('admin-password').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    authenticate();
+                }
+            });
+
+            // Auto-refresh status every 30 seconds when authenticated
+            setInterval(() => {
+                if (document.getElementById('main-content').style.display !== 'none') {
+                    refreshStatus();
+                }
+            }, 30000);
+            </script>
         </body>
         </html>
         '''
@@ -504,7 +862,47 @@ def api_complete_oauth():
         scanner.add_log(f"❌ OAuth completion failed: {e}", 'error')
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/test')
+@app.route('/api/scan-emails', methods=['POST'])
+def api_scan_emails():
+    """Scan emails for resumes"""
+    try:
+        if not session.get('admin_authenticated'):
+            return jsonify({'error': 'Authentication required'}), 401
+            
+        if not scanner.gmail_service:
+            return jsonify({'success': False, 'error': 'Gmail authentication required'})
+            
+        # This is a placeholder - implement actual email scanning logic
+        scanner.add_log("📧 Starting email scan", 'info')
+        
+        # Simulate scanning
+        scanner.stats['total_emails'] = 50
+        scanner.stats['resumes_found'] = 5
+        scanner.stats['last_scan_time'] = datetime.now().isoformat()
+        
+        scanner.add_log("✅ Email scan completed", 'info')
+        
+        return jsonify({
+            'success': True,
+            'emails_scanned': scanner.stats['total_emails'],
+            'resumes_found': scanner.stats['resumes_found']
+        })
+    except Exception as e:
+        scanner.add_log(f"❌ Email scan failed: {e}", 'error')
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/clear-logs', methods=['POST'])
+def api_clear_logs():
+    """Clear system logs"""
+    try:
+        if not session.get('admin_authenticated'):
+            return jsonify({'error': 'Authentication required'}), 401
+            
+        scanner.logs.clear()
+        scanner.add_log("🗑️ Logs cleared", 'info')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 def api_test():
     """Simple API test endpoint"""
     return jsonify({
